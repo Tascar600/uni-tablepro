@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+{% block title %}Conflict Resolution - UniTimetable Pro{% endblock %}
+{% block page_title %}Conflict Resolution{% endblock %}
+{% block page_subtitle %}Detect and resolve timetable conflicts with AI suggestions{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div class="card-header">
+        <h3>Detected Conflicts</h3>
+        <span class="badge {% if conflicts %}badge-danger{% else %}badge-success{% endif %}">
+            {{ conflicts|length }} conflict{{ 's' if conflicts|length != 1 else '' }}
+        </span>
+    </div>
+
+    {% if conflicts %}
+    {% for conflict in conflicts %}
+    <div class="conflict-item conflict-{{ conflict.severity }}">
+        <div class="flex-between mb-1">
+            <span class="badge badge-{{ 'danger' if conflict.severity == 'high' else 'warning' if conflict.severity == 'medium' else 'info' }}">
+                {{ conflict.type|upper }} CONFLICT
+            </span>
+            <span class="text-muted" style="font-size:0.78rem">{{ conflict.severity|title }} Priority</span>
+        </div>
+        <p>{{ conflict.description }}</p>
+        <div class="flex-between mt-1">
+            <div class="flex gap-1">
+                <span class="badge badge-primary">{{ conflict.entry1.course_name }}</span>
+                <span class="text-muted">vs</span>
+                <span class="badge badge-primary">{{ conflict.entry2.course_name }}</span>
+            </div>
+            <button class="btn btn-sm btn-info" onclick="showResolution({{ loop.index0 }})">View Suggestions</button>
+        </div>
+        <div id="suggestion-{{ loop.index0 }}" style="display:none" class="mt-2">
+            <div class="card" style="padding:0.75rem;background:var(--bg-input)">
+                <p class="text-muted mb-1">AI Suggestion:</p>
+                <p>{{ conflict.suggestion }}</p>
+                <button class="btn btn-sm btn-success mt-1">Apply Fix</button>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+    {% else %}
+    <div class="empty-state">
+        <div class="empty-icon">&#9989;</div>
+        <h3>No Conflicts Found</h3>
+        <p class="text-muted">Your timetable is clean! All entries are properly scheduled without clashes.</p>
+    </div>
+    {% endif %}
+</div>
+
+<div class="card">
+    <div class="card-header"><h3>AI Assistant</h3></div>
+    <p class="text-muted mb-2">Need help resolving scheduling issues? Ask the AI assistant for suggestions.</p>
+    <button class="btn btn-primary" onclick="toggleChatbot()">&#128172; Open AI Assistant</button>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+function showResolution(index) {
+    const el = document.getElementById('suggestion-' + index);
+    el.style.display = el.style.display === 'none' ? 'block' : 'none';
+}
+</script>
+{% endblock %}

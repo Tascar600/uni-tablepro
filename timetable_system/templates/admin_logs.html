@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% block title %}Activity Logs - UniTimetable Pro{% endblock %}
+{% block page_title %}Activity Logs{% endblock %}
+{% block page_subtitle %}Audit trail for all system activities{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div class="card-header">
+        <h3>Activity Audit Trail</h3>
+        <span class="badge badge-info">{{ logs|length }} entries</span>
+    </div>
+    {% if logs %}
+    <div class="table-wrapper" style="max-height:600px;overflow-y:auto">
+        <table>
+            <thead>
+                <tr>
+                    <th>User</th>
+                    <th>Action</th>
+                    <th>Details</th>
+                    <th>Type</th>
+                    <th>Timestamp</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for log in logs %}
+                <tr>
+                    <td><strong>{{ log.user_name }}</strong></td>
+                    <td><span class="badge badge-info">{{ log.action }}</span></td>
+                    <td class="text-muted">{{ log.details }}</td>
+                    <td>{{ log.entity_type or '-' }}</td>
+                    <td style="font-size:0.78rem;color:var(--text-muted)">{{ log.timestamp[:19] }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div class="empty-state">
+        <div class="empty-icon">&#9776;</div>
+        <h3>No activity recorded</h3>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

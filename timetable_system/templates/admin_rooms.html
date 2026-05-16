@@ -1,0 +1,117 @@
+{% extends "base.html" %}
+{% block title %}Rooms - UniTimetable Pro{% endblock %}
+{% block page_title %}Room Management{% endblock %}
+{% block page_subtitle %}Manage rooms, buildings, and facilities{% endblock %}
+
+{% block content %}
+<div class="grid-2">
+    <div class="card">
+        <div class="card-header"><h3>Add New Room</h3></div>
+        <form method="POST" action="/admin/rooms/add">
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Room Name</label>
+                    <input type="text" name="name" required placeholder="e.g. Hall A">
+                </div>
+                <div class="form-group">
+                    <label>Capacity</label>
+                    <input type="number" name="capacity" min="1" value="30">
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Building</label>
+                    <input type="text" name="building" value="Main">
+                </div>
+                <div class="form-group">
+                    <label>Floor</label>
+                    <input type="number" name="floor" min="0" value="1">
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Room Type</label>
+                    <select name="room_type">
+                        <option value="classroom">Classroom</option>
+                        <option value="lab">Laboratory</option>
+                        <option value="lecture_hall">Lecture Hall</option>
+                        <option value="seminar">Seminar Room</option>
+                    </select>
+                </div>
+                <div class="form-group" style="display:flex;align-items:center;gap:1rem;padding-top:1.5rem">
+                    <label class="switch">
+                        <input type="checkbox" name="has_projector">
+                        <span class="slider"></span>
+                    </label>
+                    <span style="font-size:0.85rem">Projector</span>
+                    <label class="switch">
+                        <input type="checkbox" name="has_computers">
+                        <span class="slider"></span>
+                    </label>
+                    <span style="font-size:0.85rem">Computers</span>
+                </div>
+            </div>
+            <button type="submit" class="btn btn-primary">Add Room</button>
+        </form>
+    </div>
+
+    <div class="card">
+        <div class="card-header"><h3>Statistics</h3></div>
+        <div class="stats-grid" style="grid-template-columns:1fr 1fr">
+            <div class="stat-card">
+                <div class="stat-number">{{ rooms|length }}</div>
+                <div class="stat-label">Total Rooms</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number">{{ rooms|selectattr('has_projector','equalto',1)|list|length }}</div>
+                <div class="stat-label">With Projector</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header"><h3>All Rooms</h3></div>
+    {% if rooms %}
+    <div class="table-wrapper">
+        <table>
+            <thead>
+                <tr>
+                    <th>Name</th>
+                    <th>Building</th>
+                    <th>Floor</th>
+                    <th>Type</th>
+                    <th>Capacity</th>
+                    <th>Projector</th>
+                    <th>Computers</th>
+                    <th>Action</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for r in rooms %}
+                <tr>
+                    <td><strong>{{ r.name }}</strong></td>
+                    <td>{{ r.building }}</td>
+                    <td>{{ r.floor }}</td>
+                    <td><span class="badge badge-info">{{ r.room_type|replace('_',' ')|title }}</span></td>
+                    <td>{{ r.capacity }}</td>
+                    <td>{{ '&#10003;'|safe if r.has_projector else '&#10007;'|safe }}</td>
+                    <td>{{ '&#10003;'|safe if r.has_computers else '&#10007;'|safe }}</td>
+                    <td>
+                        <form method="POST" action="/admin/rooms/delete/{{ r.id }}" style="display:inline">
+                            <button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('Delete {{ r.name }}?')">Delete</button>
+                        </form>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div class="empty-state">
+        <div class="empty-icon">&#8962;</div>
+        <h3>No rooms yet</h3>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Shared Timetable - UniTimetable Pro</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <div class="content-area" style="max-width:1200px;margin:0 auto">
+        <div class="card mt-3">
+            <div class="card-header">
+                <h2>&#128279; Shared Timetable</h2>
+                <span class="badge badge-primary">View Only</span>
+            </div>
+            <p class="text-muted mb-2">This timetable has been shared with you. It is view-only.</p>
+            {% if timetable %}
+            <div class="timetable-container">
+                <div class="timetable-grid">
+                    <div class="timetable-header">Time</div>
+                    {% set days = ['Monday','Tuesday','Wednesday','Thursday','Friday'] %}
+                    {% for day in days %}
+                    <div class="timetable-header">{{ day[:3] }}</div>
+                    {% endfor %}
+                    {% set slots = ['07:00-09:00','09:00-11:00','11:00-13:00','14:00-16:00','16:00-18:00'] %}
+                    {% for slot in slots %}
+                    {% set s = slot.split('-') %}
+                    <div class="timetable-time">{{ s[0] }}<br><small>{{ s[1] }}</small></div>
+                    {% for day in days %}
+                    <div class="timetable-cell">
+                        {% for entry in timetable if entry.day == day and entry.start_time >= s[0] and entry.end_time <= s[1] %}
+                        <div class="timetable-event" style="background:{{ entry.color or '#4f8cff' }}">
+                            <div class="event-title">{{ entry.course_name }}</div>
+                            <div class="event-info">{{ entry.start_time }}-{{ entry.end_time }} | {{ entry.room_name }}</div>
+                            <div class="event-info">{{ entry.lecturer_name }}</div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% endfor %}
+                    {% endfor %}
+                </div>
+            </div>
+            {% else %}
+            <div class="empty-state"><h3>Timetable is empty</h3></div>
+            {% endif %}
+        </div>
+    </div>
+</body>
+</html>

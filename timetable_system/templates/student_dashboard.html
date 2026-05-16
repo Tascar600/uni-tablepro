@@ -1,0 +1,126 @@
+{% extends "base.html" %}
+{% block title %}My Timetable - UniTimetable Pro{% endblock %}
+{% block page_title %}My Timetable{% endblock %}
+{% block page_subtitle %}Your personalized course schedule{% endblock %}
+
+{% block content %}
+{% if not published %}
+<div class="alert alert-warning">Timetable has not been published yet. Please check back later.</div>
+{% endif %}
+
+{% if timetable %}
+<div class="card">
+    <div class="card-header">
+        <h3>My Weekly Schedule</h3>
+        <div class="flex gap-1">
+            <input type="text" id="searchInput" placeholder="&#128269; Search..." style="padding:0.5rem 0.75rem;background:var(--bg-input);border:1px solid var(--border-color);border-radius:var(--radius-sm);color:var(--text-primary);font-size:0.85rem;width:200px">
+        </div>
+    </div>
+
+    <div class="timetable-container">
+        <div class="timetable-grid">
+            <div class="timetable-header">Time</div>
+            {% set days = ['Monday','Tuesday','Wednesday','Thursday','Friday'] %}
+            {% for day in days %}
+            <div class="timetable-header">{{ day[:3] }}</div>
+            {% endfor %}
+
+            {% set slots = ['07:00-09:00','09:00-11:00','11:00-13:00','14:00-16:00','16:00-18:00'] %}
+            {% for slot in slots %}
+            {% set s = slot.split('-') %}
+            <div class="timetable-time">{{ s[0] }}<br><small>{{ s[1] }}</small></div>
+            {% for day in days %}
+            <div class="timetable-cell">
+                {% for entry in timetable if entry.day == day and entry.start_time >= s[0] and entry.end_time <= s[1] %}
+                <div class="timetable-event"
+                     style="background:{{ entry.color or '#4f8cff' }}"
+                     data-lecturer="{{ entry.lecturer_name }}"
+                     data-room="{{ entry.room_name }}"
+                     data-group="{{ entry.group_name }}"
+                     data-course="{{ entry.course_name }}">
+                    <div class="event-title">{{ entry.course_name }}</div>
+                    <div class="event-info">{{ entry.start_time }}-{{ entry.end_time }} | {{ entry.room_name }}</div>
+                    <div class="event-info">{{ entry.lecturer_name }}</div>
+                </div>
+                {% endfor %}
+            </div>
+            {% endfor %}
+            {% endfor %}
+        </div>
+    </div>
+</div>
+
+<div class="grid-2">
+    <div class="card">
+        <div class="card-header"><h3>Day-wise Schedule</h3></div>
+        {% set days_of_week = ['Monday','Tuesday','Wednesday','Thursday','Friday'] %}
+        {% for day in days_of_week %}
+        <div class="mb-2">
+            <h4 style="font-size:0.9rem;color:var(--accent-primary);margin-bottom:0.35rem;border-left:3px solid var(--accent-primary);padding-left:0.5rem;">{{ day }}</h4>
+            {% set day_entries = timetable|selectattr('day','equalto',day)|list %}
+            {% if day_entries %}
+            <div style="font-size:0.85rem">
+                {% for e in day_entries %}
+                <div class="flex-between" style="padding:0.3rem 0;border-bottom:1px solid var(--border-color)">
+                    <span><strong>{{ e.start_time }}-{{ e.end_time }}</strong> {{ e.course_name }}</span>
+                    <span class="text-muted">{{ e.room_name }}</span>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <p class="text-muted" style="font-size:0.82rem">No classes scheduled</p>
+            {% endif %}
+        </div>
+        {% endfor %}
+    </div>
+
+    <div class="card">
+        <div class="card-header"><h3>Quick Info</h3></div>
+        {% set total_hours = namespace(value=0) %}
+        {% set total_classes = namespace(value=0) %}
+        {% for e in timetable %}
+        {% set ns = namespace(h=0) %}
+        {% set start_h = e.start_time.split(':')[0]|int %}
+        {% set end_h = e.end_time.split(':')[0]|int %}
+        {% set total_hours.value = total_hours.value + (end_h - start_h) %}
+        {% set total_classes.value = total_classes.value + 1 %}
+        {% endfor %}
+        <div class="stats-grid" style="grid-template-columns:1fr 1fr">
+            <div class="stat-card" style="text-align:center;padding:1rem">
+                <div class="stat-number">{{ total_classes.value }}</div>
+                <div class="stat-label">Weekly Classes</div>
+            </div>
+            <div class="stat-card" style="text-align:center;padding:1rem">
+                <div class="stat-number">{{ total_hours.value }}</div>
+                <div class="stat-label">Hours/Week</div>
+            </div>
+            <div class="stat-card" style="text-align:center;padding:1rem">
+                <div class="stat-number">{{ timetable|map(attribute='lecturer_name')|unique|list|length }}</div>
+                <div class="stat-label">Lecturers</div>
+            </div>
+            <div class="stat-card" style="text-align:center;padding:1rem">
+                <div class="stat-number">{{ timetable|map(attribute='room_name')|unique|list|length }}</div>
+                <div class="stat-label">Rooms Used</div>
+            </div>
+        </div>
+
+        <div class="mt-3">
+            <h4 class="mb-1">Export & Share</h4>
+            <div class="btn-group">
+                <button class="btn btn-sm btn-ghost" onclick="exportICS()">&#128197; Google Calendar</button>
+                <button class="btn btn-sm btn-ghost" onclick="exportCSV()">&#128196; CSV</button>
+                <button class="btn btn-sm btn-ghost" onclick="shareTimetable()">&#128279; Share</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% elif published %}
+<div class="card">
+    <div class="empty-state">
+        <div class="empty-icon">&#128197;</div>
+        <h3>Timetable is empty</h3>
+        <p class="text-muted">The timetable is published but has no entries yet.</p>
+    </div>
+</div>
+{% endif %}
+{% endblock %}

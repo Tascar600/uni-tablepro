@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+{% block title %}Room Utilization Heatmap - UniTimetable Pro{% endblock %}
+{% block page_title %}Room Utilization Heatmap{% endblock %}
+{% block page_subtitle %}Visualize room usage across days and time slots{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div class="card-header">
+        <h3>Room Heatmap</h3>
+        <span class="badge badge-info">{{ data.rooms|length }} rooms</span>
+    </div>
+    {% if data.rooms %}
+    <div class="heatmap-container">
+        <table class="heatmap-table">
+            <thead>
+                <tr>
+                    <th>Room</th>
+                    {% for day in data.days %}
+                    <th colspan="{{ data.slots|length }}" style="text-align:center">{{ day[:3] }}</th>
+                    {% endfor %}
+                </tr>
+                <tr>
+                    <th></th>
+                    {% for day in data.days %}
+                    {% for slot in data.slots %}
+                    <th style="font-size:0.65rem;padding:0.3rem">{{ slot }}</th>
+                    {% endfor %}
+                    {% endfor %}
+                </tr>
+            </thead>
+            <tbody id="heatmapBody">
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div class="empty-state">
+        <div class="empty-icon">&#9722;</div>
+        <h3>No data available</h3>
+        <p class="text-muted">Generate and publish the timetable to see room utilization data.</p>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const data = {{ data|tojson }};
+    initHeatmap(data);
+});
+</script>
+{% endblock %}

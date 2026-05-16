@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}UniTimetable Pro{% endblock %}</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📚</text></svg>">
+    {% block extra_head %}{% endblock %}
+</head>
+<body>
+    <div class="app-layout">
+        {% if session.user_id %}
+        <aside class="sidebar" id="sidebar">
+            <div class="sidebar-brand">
+                <div class="logo">UT</div>
+                <div>
+                    <h2>UniTimetable</h2>
+                    <small>University Platform</small>
+                </div>
+            </div>
+            <div class="sidebar-user">
+                <div class="avatar">{{ session.full_name[:1] }}</div>
+                <div class="user-info">
+                    <div class="name">{{ session.full_name }}</div>
+                    <div class="role">{{ session.role|title }}</div>
+                </div>
+            </div>
+            <nav class="sidebar-nav">
+                {% if session.role == 'admin' %}
+                <div class="nav-section">Main</div>
+                <a href="{{ url_for('dashboard') }}" class="{{ 'active' if request.endpoint == 'dashboard' }}">
+                    <span class="nav-icon">&#9632;</span> Dashboard
+                </a>
+                <a href="{{ url_for('admin_courses') }}" class="{{ 'active' if request.endpoint == 'admin_courses' }}">
+                    <span class="nav-icon">&#9776;</span> Courses
+                </a>
+                <a href="{{ url_for('admin_lecturers') }}" class="{{ 'active' if request.endpoint == 'admin_lecturers' }}">
+                    <span class="nav-icon">&#9733;</span> Lecturers
+                </a>
+                <a href="{{ url_for('admin_rooms') }}" class="{{ 'active' if request.endpoint == 'admin_rooms' }}">
+                    <span class="nav-icon">&#8962;</span> Rooms
+                </a>
+                <div class="nav-section">Timetable</div>
+                <a href="{{ url_for('admin_analytics') }}" class="{{ 'active' if request.endpoint == 'admin_analytics' }}">
+                    <span class="nav-icon">&#9733;</span> Analytics
+                </a>
+                <a href="{{ url_for('admin_conflicts') }}" class="{{ 'active' if request.endpoint == 'admin_conflicts' }}">
+                    <span class="nav-icon">&#9888;</span> Conflicts
+                </a>
+                <a href="{{ url_for('admin_versions') }}" class="{{ 'active' if request.endpoint == 'admin_versions' }}">
+                    <span class="nav-icon">&#8635;</span> Versions
+                </a>
+                <a href="{{ url_for('admin_heatmap') }}" class="{{ 'active' if request.endpoint == 'admin_heatmap' }}">
+                    <span class="nav-icon">&#9722;</span> Heatmap
+                </a>
+                <div class="nav-section">Tools</div>
+                <a href="{{ url_for('admin_activity_logs') }}" class="{{ 'active' if request.endpoint == 'admin_activity_logs' }}">
+                    <span class="nav-icon">&#9776;</span> Activity Logs
+                </a>
+                <a href="{{ url_for('admin_live_tv') }}" class="{{ 'active' if request.endpoint == 'admin_live_tv' }}">
+                    <span class="nav-icon">&#9654;</span> Live TV
+                </a>
+                {% elif session.role == 'lecturer' %}
+                <div class="nav-section">Main</div>
+                <a href="{{ url_for('dashboard') }}" class="{{ 'active' if request.endpoint == 'dashboard' }}">
+                    <span class="nav-icon">&#9632;</span> Dashboard
+                </a>
+                <a href="{{ url_for('lecturer_availability') }}" class="{{ 'active' if request.endpoint == 'lecturer_availability' }}">
+                    <span class="nav-icon">&#9733;</span> Availability
+                </a>
+                {% elif session.role == 'student' %}
+                <div class="nav-section">Main</div>
+                <a href="{{ url_for('dashboard') }}" class="{{ 'active' if request.endpoint == 'dashboard' }}">
+                    <span class="nav-icon">&#9632;</span> My Timetable
+                </a>
+                {% endif %}
+                <div class="nav-section">Account</div>
+                <a href="{{ url_for('logout') }}">
+                    <span class="nav-icon">&#8617;</span> Logout
+                </a>
+            </nav>
+        </aside>
+        <div class="overlay" id="sidebarOverlay" onclick="toggleSidebar()"></div>
+        {% endif %}
+
+        <div class="main-content">
+            {% if session.user_id %}
+            <header class="top-header">
+                <div class="page-title">
+                    <button class="header-btn hide-desktop" onclick="toggleSidebar()" style="margin-right:0.75rem;border-radius:var(--radius-sm);">&#9776;</button>
+                    <h1>{% block page_title %}Dashboard{% endblock %}</h1>
+                    <p>{% block page_subtitle %}{% endblock %}</p>
+                </div>
+                <div class="header-actions">
+                    <button class="header-btn" onclick="toggleLiveTV()" title="Live TV Display">&#9654;</button>
+                    <button class="header-btn" onclick="exportICS()" title="Export to Google Calendar">&#128197;</button>
+                    <button class="header-btn" onclick="exportCSV()" title="Export to CSV">&#128196;</button>
+                    <button class="header-btn" onclick="shareTimetable()" title="Share Timetable">&#128279;</button>
+                    <button class="header-btn hide-mobile" onclick="toggleNotifPanel()">
+                        &#128276;
+                        <span class="notif-dot" id="notifDot" style="display:none"></span>
+                    </button>
+                </div>
+            </header>
+            {% endif %}
+
+            <div class="content-area">
+                {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                {% for category, message in messages %}
+                <div class="alert alert-{{ category if category in ['success','error','warning','info'] else 'info' }}">{{ message }}</div>
+                {% endfor %}
+                {% endif %}
+                {% endwith %}
+
+                {% block content %}{% endblock %}
+            </div>
+        </div>
+    </div>
+
+    {% if session.user_id %}
+    <div class="overlay" id="notifOverlay" onclick="closeNotifPanel()"></div>
+    <div class="notif-panel" id="notifPanel">
+        <div class="notif-panel-header">
+            <h3>Notifications</h3>
+            <div class="flex gap-1">
+                <button class="btn btn-sm btn-ghost" onclick="markAllRead()">Mark All Read</button>
+                <button class="header-btn" onclick="closeNotifPanel()">&#10005;</button>
+            </div>
+        </div>
+        <div class="notif-panel-body" id="notifList">
+            <div class="empty-state"><div class="empty-icon">&#128276;</div><h3>Loading...</h3></div>
+        </div>
+    </div>
+
+    <button class="chatbot-btn" id="chatbotBtn" onclick="toggleChatbot()">&#128172;</button>
+    <div class="chatbot-window" id="chatbotWindow">
+        <div class="chatbot-header">
+            <h3>AI Assistant</h3>
+            <button class="close-btn" onclick="toggleChatbot()">&#10005;</button>
+        </div>
+        <div class="chatbot-messages" id="chatMessages">
+            <div class="chat-message bot">Hello! I'm your timetable AI assistant. Ask me about conflicts, schedules, workloads, and more!</div>
+        </div>
+        <div class="chatbot-input">
+            <input type="text" id="chatInput" placeholder="Ask me anything about the timetable...">
+            <button onclick="sendChat()">&#10148;</button>
+        </div>
+    </div>
+
+    <div class="modal" id="shareModal">
+        <div class="modal-backdrop" onclick="closeModal('shareModal')"></div>
+        <div class="modal-content">
+            <h3>Share Timetable</h3>
+            <div class="form-group">
+                <label>Share Link</label>
+                <div class="flex gap-1">
+                    <input type="text" id="shareUrl" readonly style="flex:1">
+                    <button class="btn btn-primary btn-sm" onclick="copyShareUrl()">Copy</button>
+                </div>
+            </div>
+            <p class="text-muted">This link expires in 48 hours. Anyone with this link can view the timetable.</p>
+            <button class="btn btn-ghost btn-block mt-2" onclick="closeModal('shareModal')">Close</button>
+        </div>
+    </div>
+
+    <div class="modal" id="conflictModal">
+        <div class="modal-backdrop" onclick="closeModal('conflictModal')"></div>
+        <div class="modal-content">
+            <h3>&#9888; Conflicts Detected</h3>
+            <div id="conflictList"></div>
+            <div class="btn-group mt-2">
+                <button class="btn btn-danger" onclick="forceMove()">Force Move Anyway</button>
+                <button class="btn btn-ghost" onclick="closeModal('conflictModal')">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="toastContainer" style="position:fixed;top:1rem;right:1rem;z-index:9999;max-width:360px;"></div>
+
+    <div class="live-tv" id="liveTV">
+        <div class="live-tv-header">
+            <h1>&#9654; Live Timetable Display</h1>
+            <button class="btn btn-lg btn-ghost" onclick="closeLiveTV()" style="color:white;">&#10005; Exit</button>
+        </div>
+        <div class="live-tv-grid" id="liveTVGrid">
+            {% set days = ['Monday','Tuesday','Wednesday','Thursday','Friday'] %}
+            {% for day in days %}
+            <div class="live-tv-day">
+                <h2>{{ day }}</h2>
+                {% if timetable %}
+                {% for e in timetable if e.day == day %}
+                <div class="live-tv-event" style="background:{{ e.color or '#4f8cff' }}">
+                    <div class="tv-time">{{ e.start_time }} - {{ e.end_time }}</div>
+                    <div class="tv-course">{{ e.course_name }}</div>
+                    <div class="tv-detail">{{ e.lecturer_name }} | {{ e.room_name }}</div>
+                </div>
+                {% endfor %}
+                {% endif %}
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
+    <script src="/static/app.js"></script>
+    {% block extra_scripts %}{% endblock %}
+</body>
+</html>

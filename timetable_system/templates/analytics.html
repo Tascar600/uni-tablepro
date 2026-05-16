@@ -1,0 +1,94 @@
+{% extends "base.html" %}
+{% block title %}Analytics - UniTimetable Pro{% endblock %}
+{% block page_title %}Analytics Dashboard{% endblock %}
+{% block page_subtitle %}Data-driven insights into your timetable system{% endblock %}
+
+{% block content %}
+<div class="stats-grid">
+    <div class="stat-card fade-in">
+        <div class="stat-icon" style="background:rgba(79,140,255,0.15);color:var(--accent-primary)">&#128202;</div>
+        <div class="stat-number">{{ data.total_entries }}</div>
+        <div class="stat-label">Total Entries</div>
+    </div>
+    <div class="stat-card fade-in" style="animation-delay:0.1s">
+        <div class="stat-icon" style="background:rgba(0,214,143,0.15);color:var(--accent-success)">&#10003;</div>
+        <div class="stat-number">{{ data.published_count }}</div>
+        <div class="stat-label">Published Entries</div>
+    </div>
+    <div class="stat-card fade-in" style="animation-delay:0.2s">
+        <div class="stat-icon" style="background:rgba(108,92,231,0.15);color:var(--accent-secondary)">&#9733;</div>
+        <div class="stat-number">{{ data.efficiency }}<small style="font-size:0.7rem;color:var(--text-muted)">/100</small></div>
+        <div class="stat-label">Efficiency Score</div>
+        <div class="stat-trend {% if data.efficiency >= 70 %}up{% else %}down{% endif %}">
+            {{ 'Optimal' if data.efficiency >= 80 else 'Fair' if data.efficiency >= 50 else 'Needs Improvement' }}
+        </div>
+    </div>
+    <div class="stat-card fade-in" style="animation-delay:0.3s">
+        <div class="stat-icon" style="background:rgba(255,170,68,0.15);color:var(--accent-warning)">&#128101;</div>
+        <div class="stat-number">{{ data.total_students }}</div>
+        <div class="stat-label">Students</div>
+    </div>
+</div>
+
+<div class="charts-grid">
+    <div class="card">
+        <div class="card-header"><h3>Classes per Day</h3></div>
+        <div class="chart-container"><canvas id="dayChart"></canvas></div>
+    </div>
+    <div class="card">
+        <div class="card-header"><h3>Lecturer Workload (Hours/Week)</h3></div>
+        <div class="chart-container"><canvas id="lecturerChart"></canvas></div>
+    </div>
+</div>
+
+<div class="charts-grid">
+    <div class="card">
+        <div class="card-header"><h3>Room Utilization</h3></div>
+        <div class="chart-container" style="height:350px"><canvas id="roomChart"></canvas></div>
+    </div>
+    <div class="card">
+        <div class="card-header"><h3>Course Level Distribution</h3></div>
+        <div class="chart-container" style="height:350px"><canvas id="levelChart"></canvas></div>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header"><h3>Room Utilization Details</h3></div>
+    {% if data.room_usage %}
+    <div class="table-wrapper">
+        <table>
+            <thead>
+                <tr><th>Room</th><th>Bookings</th><th>Total Hours</th><th>Capacity</th><th>Utilization</th></tr>
+            </thead>
+            <tbody>
+                {% for r in data.room_usage %}
+                <tr>
+                    <td><strong>{{ r.name }}</strong></td>
+                    <td>{{ r.count }}</td>
+                    <td>{{ r.hours }}h</td>
+                    <td>{{ r.capacity }}</td>
+                    <td>
+                        <div style="display:flex;align-items:center;gap:0.5rem">
+                            <div style="flex:1;height:8px;background:var(--bg-input);border-radius:4px;overflow:hidden;min-width:100px">
+                                <div style="height:100%;width:{{ r.utilization }}%;background:linear-gradient(90deg,var(--accent-primary),var(--accent-success));border-radius:4px;transition:width 0.5s"></div>
+                            </div>
+                            <span style="font-size:0.8rem;color:var(--text-secondary)">{{ r.utilization }}%</span>
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const chartData = {{ data|tojson }};
+    initCharts(chartData);
+});
+</script>
+{% endblock %}

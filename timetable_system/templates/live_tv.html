@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% block title %}Live TV - UniTimetable Pro{% endblock %}
+{% block page_title %}Live TV Display Mode{% endblock %}
+{% block page_subtitle %}Full-screen classroom display{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div class="card-header">
+        <h3>Live TV Mode</h3>
+        <button class="btn btn-primary" onclick="toggleLiveTV()">&#9654; Launch Fullscreen</button>
+    </div>
+    <p class="text-muted">Click the button above to enter full-screen Live TV mode, perfect for display screens in hallways and classrooms. The display auto-updates every 30 seconds.</p>
+</div>
+
+<div class="card">
+    <div class="card-header"><h3>Today's Schedule Overview</h3></div>
+    {% set today = now.strftime('%A') %}
+    {% set today_entries = timetable|selectattr('day','equalto',today)|list %}
+    {% if today_entries %}
+    <div class="grid-2">
+        {% for e in today_entries %}
+        <div class="card" style="padding:1rem;border-left:4px solid {{ e.color or '#4f8cff' }}">
+            <div class="flex-between">
+                <strong>{{ e.course_name }}</strong>
+                <span class="badge badge-primary">{{ e.start_time }}-{{ e.end_time }}</span>
+            </div>
+            <div class="text-muted mt-1" style="font-size:0.85rem">
+                {{ e.lecturer_name }} | {{ e.room_name }} | {{ e.group_name }}
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <p class="text-muted">No classes scheduled for {{ today }}.</p>
+    {% endif %}
+</div>
+{% endblock %}

@@ -1,0 +1,162 @@
+{% extends "base.html" %}
+{% block title %}Admin Dashboard - UniTimetable Pro{% endblock %}
+{% block page_title %}Admin Dashboard{% endblock %}
+{% block page_subtitle %}Manage your university timetable system{% endblock %}
+
+{% block content %}
+<div class="stats-grid">
+    <div class="stat-card fade-in">
+        <div class="stat-icon" style="background:rgba(79,140,255,0.15);color:var(--accent-primary)">&#128218;</div>
+        <div class="stat-number">{{ course_count }}</div>
+        <div class="stat-label">Total Courses</div>
+    </div>
+    <div class="stat-card fade-in" style="animation-delay:0.1s">
+        <div class="stat-icon" style="background:rgba(0,214,143,0.15);color:var(--accent-success)">&#128101;</div>
+        <div class="stat-number">{{ lecturer_count }}</div>
+        <div class="stat-label">Lecturers</div>
+    </div>
+    <div class="stat-card fade-in" style="animation-delay:0.2s">
+        <div class="stat-icon" style="background:rgba(108,92,231,0.15);color:var(--accent-secondary)">&#8962;</div>
+        <div class="stat-number">{{ room_count }}</div>
+        <div class="stat-label">Rooms</div>
+    </div>
+    <div class="stat-card fade-in" style="animation-delay:0.3s">
+        <div class="stat-icon" style="background:rgba(255,170,68,0.15);color:var(--accent-warning)">&#128197;</div>
+        <div class="stat-number">{{ entry_count }}</div>
+        <div class="stat-label">Timetable Entries</div>
+        <div class="stat-trend {% if published %}up{% else %}down{% endif %}">
+            {{ 'Published' if published else 'Draft' }}
+        </div>
+    </div>
+</div>
+
+<div class="grid-2">
+    <div class="card">
+        <div class="card-header">
+            <h3>Timetable Generation</h3>
+            <span class="badge badge-{% if published %}success{% else %}warning{% endif %}">
+                {{ 'Published' if published else 'Draft' }}
+            </span>
+        </div>
+        <p class="text-muted mb-2">Generate a smart, clash-free timetable with optimized scheduling.</p>
+        <div class="btn-group">
+            <button id="generateBtn" class="btn btn-success btn-lg" onclick="generateTimetable()">
+                &#9889; Generate Timetable
+            </button>
+            {% if published %}
+            <form method="POST" action="/admin/unpublish" style="display:inline">
+                <button type="submit" class="btn btn-warning btn-lg">Unpublish</button>
+            </form>
+            {% else %}
+            <form method="POST" action="/admin/publish" style="display:inline">
+                <button type="submit" class="btn btn-primary btn-lg">Publish Timetable</button>
+            </form>
+            {% endif %}
+            <form method="POST" action="/admin/delete-timetable" style="display:inline">
+                <button type="submit" class="btn btn-danger btn-lg" onclick="return confirm('Clear entire timetable?')">Clear</button>
+            </form>
+        </div>
+        <div id="generateStatus" class="alert" style="display:none;margin-top:1rem"></div>
+    </div>
+
+    <div class="card">
+        <div class="card-header">
+            <h3>Quick Actions</h3>
+        </div>
+        <div class="grid-2">
+            <a href="{{ url_for('admin_courses') }}" class="btn btn-secondary btn-block">&#9776; Manage Courses</a>
+            <a href="{{ url_for('admin_lecturers') }}" class="btn btn-secondary btn-block">&#9733; Manage Lecturers</a>
+            <a href="{{ url_for('admin_rooms') }}" class="btn btn-secondary btn-block">&#8962; Manage Rooms</a>
+            <a href="{{ url_for('admin_analytics') }}" class="btn btn-secondary btn-block">&#9733; View Analytics</a>
+            <a href="{{ url_for('admin_conflicts') }}" class="btn btn-secondary btn-block">&#9888; Resolve Conflicts</a>
+            <a href="{{ url_for('admin_heatmap') }}" class="btn btn-secondary btn-block">&#9722; Room Heatmap</a>
+        </div>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header">
+        <h3>Timetable Calendar View</h3>
+        <div class="btn-group">
+            <button class="btn btn-sm btn-ghost" onclick="exportICS()">&#128197; ICS</button>
+            <button class="btn btn-sm btn-ghost" onclick="exportCSV()">&#128196; CSV</button>
+        </div>
+    </div>
+    {% if timetable %}
+    <div class="timetable-legend">
+        {% set colors = {'university': '#4f8cff', 'department': '#00d68f', 'single': '#ffaa44'} %}
+        {% for level, color in colors.items() %}
+        <div class="legend-item"><span class="legend-color" style="background:{{ color }}"></span> {{ level|title }}</div>
+        {% endfor %}
+    </div>
+    <div class="timetable-container">
+        <div class="timetable-grid">
+            <div class="timetable-header">Time</div>
+            {% set days = ['Monday','Tuesday','Wednesday','Thursday','Friday'] %}
+            {% for day in days %}
+            <div class="timetable-header">{{ day }}</div>
+            {% endfor %}
+
+            {% set slots = ['07:00-09:00','09:00-11:00','11:00-13:00','14:00-16:00','16:00-18:00'] %}
+            {% for slot in slots %}
+            {% set s = slot.split('-') %}
+            <div class="timetable-time">{{ s[0] }}<br><small>{{ s[1] }}</small></div>
+            {% for day in days %}
+            <div class="timetable-cell" data-day="{{ day }}" data-time="{{ slot }}">
+                {% for entry in timetable if entry.day == day and entry.start_time >= s[0] and entry.end_time <= s[1] %}
+                <div class="timetable-event"
+                     data-entry-id="{{ entry.id }}"
+                     data-lecturer-id="{{ entry.lecturer_id }}"
+                     data-room-id="{{ entry.room_id }}"
+                     data-group="{{ entry.group_name }}"
+                     data-day="{{ day }}"
+                     data-start-time="{{ entry.start_time }}"
+                     data-end-time="{{ entry.end_time }}"
+                     data-lecturer="{{ entry.lecturer_name }}"
+                     data-room="{{ entry.room_name }}"
+                     data-course="{{ entry.course_name }}"
+                     style="background:{{ entry.color or '#4f8cff' }}">
+                    <div class="event-title">{{ entry.course_name }}</div>
+                    <div class="event-info">{{ entry.start_time }}-{{ entry.end_time }} | {{ entry.room_name }}</div>
+                    <div class="event-info">{{ entry.lecturer_name }}</div>
+                </div>
+                {% endfor %}
+            </div>
+            {% endfor %}
+            {% endfor %}
+        </div>
+    </div>
+    <p class="text-muted mt-2">&#128161; Drag and drop events to reschedule. Conflicts will be validated in real-time.</p>
+    {% else %}
+    <div class="empty-state">
+        <div class="empty-icon">&#128197;</div>
+        <h3>No timetable generated yet</h3>
+        <p class="text-muted">Click "Generate Timetable" to create a smart, optimized schedule.</p>
+    </div>
+    {% endif %}
+</div>
+
+{% if recent_logs %}
+<div class="card">
+    <div class="card-header">
+        <h3>Recent Activity</h3>
+        <a href="{{ url_for('admin_activity_logs') }}" class="btn btn-sm btn-ghost">View All</a>
+    </div>
+    <table>
+        <thead>
+            <tr><th>User</th><th>Action</th><th>Details</th><th>Time</th></tr>
+        </thead>
+        <tbody>
+            {% for log in recent_logs %}
+            <tr>
+                <td>{{ log.user_name }}</td>
+                <td><span class="badge badge-info">{{ log.action }}</span></td>
+                <td class="text-muted">{{ log.details }}</td>
+                <td class="text-muted" style="font-size:0.78rem">{{ log.timestamp[:19] }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endif %}
+{% endblock %}

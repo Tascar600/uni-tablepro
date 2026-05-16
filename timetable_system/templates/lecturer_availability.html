@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+{% block title %}My Availability - UniTimetable Pro{% endblock %}
+{% block page_title %}My Availability Calendar{% endblock %}
+{% block page_subtitle %}Set your teaching availability and unavailability periods{% endblock %}
+
+{% block content %}
+<div class="grid-2">
+    <div class="card">
+        <div class="card-header"><h3>Set Availability</h3></div>
+        <p class="text-muted mb-2">Define your weekly teaching availability. The scheduler will respect these preferences.</p>
+        <div class="form-group">
+            <label>Available Slots</label>
+            {% set days = ['Monday','Tuesday','Wednesday','Thursday','Friday'] %}
+            {% set slots = [('07:00','09:00'),('09:00','11:00'),('11:00','13:00'),('14:00','16:00'),('16:00','18:00')] %}
+            <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:0.5rem">
+                {% for day in days %}
+                <div>
+                    <strong style="font-size:0.8rem">{{ day[:3] }}</strong>
+                    {% for start, end in slots %}
+                    <label class="flex-center" style="font-size:0.78rem;cursor:pointer;padding:0.2rem 0;gap:0.3rem">
+                        <input type="checkbox" class="avail-check" data-day="{{ day }}" data-start="{{ start }}" data-end="{{ end }}"
+                               {% for a in availability if a.day == day and a.start_time == start %}checked{% endfor %}
+                               style="width:0.9rem;height:0.9rem">
+                        {{ start }}-{{ end }}
+                    </label>
+                    {% endfor %}
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        <button class="btn btn-primary" onclick="saveAvailability()">Save Availability</button>
+    </div>
+
+    <div class="card">
+        <div class="card-header"><h3>Current Preferences</h3></div>
+        <p class="text-muted mb-2">Update your scheduling preferences in the dashboard settings.</p>
+        <a href="{{ url_for('dashboard') }}" class="btn btn-secondary">Go to Dashboard</a>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+function saveAvailability() {
+    const slots = [];
+    document.querySelectorAll('.avail-check:checked').forEach(cb => {
+        slots.push({
+            day: cb.dataset.day,
+            start: cb.dataset.start,
+            end: cb.dataset.end
+        });
+    });
+
+    fetch('/lecturer/availability', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({slots})
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.status === 'ok') {
+            showToast('Availability saved!', 'success');
+        }
+    })
+    .catch(() => showToast('Error saving availability', 'error'));
+}
+</script>
+{% endblock %}

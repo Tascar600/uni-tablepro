@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+{% block title %}Version History - UniTimetable Pro{% endblock %}
+{% block page_title %}Version History & Rollback{% endblock %}
+{% block page_subtitle %}Track and restore previous timetable versions{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div class="card-header">
+        <h3>Timetable Versions</h3>
+        <span class="badge badge-info">{{ versions|length }} version{{ 's' if versions|length != 1 else '' }}</span>
+    </div>
+
+    {% if versions %}
+    <div class="timeline">
+        {% for v in versions %}
+        <div class="timeline-item {% if v.is_active %}active{% endif %}">
+            <div class="flex-between">
+                <div>
+                    <strong>Version {{ v.version_number }}</strong>
+                    {% if v.is_active %}
+                    <span class="badge badge-success" style="margin-left:0.5rem">Active</span>
+                    {% endif %}
+                </div>
+                <div class="flex gap-1">
+                    <span class="text-muted" style="font-size:0.78rem">{{ v.created_at[:19] }}</span>
+                    {% if not v.is_active %}
+                    <form method="POST" action="/admin/version/rollback/{{ v.id }}" style="display:inline">
+                        <button type="submit" class="btn btn-sm btn-warning" onclick="return confirm('Rollback to version {{ v.version_number }}? Current timetable will be replaced.')">Rollback</button>
+                    </form>
+                    {% endif %}
+                </div>
+            </div>
+            <p class="text-muted" style="font-size:0.85rem;margin-top:0.25rem">
+                {{ v.notes or 'No notes' }} by {{ v.created_by_name or 'System' }}
+            </p>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="empty-state">
+        <div class="empty-icon">&#8635;</div>
+        <h3>No versions yet</h3>
+        <p class="text-muted">Generate the timetable to create the first version.</p>
+    </div>
+    {% endif %}
+</div>
+
+<div class="card">
+    <div class="card-header"><h3>About Versioning</h3></div>
+    <p class="text-muted">Each timetable generation creates a new version automatically. You can rollback to any previous version at any time. The active version is marked with a green badge. Rolling back will create a new version with the restored data, preserving the rollback in history.</p>
+</div>
+{% endblock %}

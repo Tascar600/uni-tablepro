@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+{% block title %}Lecturers - UniTimetable Pro{% endblock %}
+{% block page_title %}Lecturer Management{% endblock %}
+{% block page_subtitle %}View and manage lecturer profiles, courses, and preferences{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div class="card-header"><h3>All Lecturers</h3></div>
+    {% for ld in lecturers %}
+    <div class="card" style="margin-bottom:0.75rem;padding:1rem;">
+        <div class="flex-between mb-2">
+            <div class="flex-center gap-2">
+                <div class="avatar" style="width:44px;height:44px;border-radius:50%;background:linear-gradient(135deg,var(--accent-primary),var(--accent-secondary));display:flex;align-items:center;justify-content:center;font-weight:700;color:white;flex-shrink:0;">{{ ld.lecturer.full_name[:1] }}</div>
+                <div>
+                    <h3 style="margin:0;">{{ ld.lecturer.full_name }}</h3>
+                    <small class="text-muted">@{{ ld.lecturer.username }} | {{ ld.lecturer.email or 'No email' }}</small>
+                </div>
+            </div>
+            <span class="badge badge-lecturer">Lecturer</span>
+        </div>
+        <div class="form-row mb-2">
+            <div class="form-group">
+                <label style="font-size:0.75rem">Preferred Days</label>
+                <div>
+                    {% if ld.preferences and ld.preferences.preferred_days %}
+                    {% set days_str = ld.preferences.preferred_days|replace('[','')|replace(']','')|replace('"','') %}
+                    {% for d in days_str.split(',') %}
+                    {% set day = d.strip() %}
+                    {% if day %}
+                    <span class="badge badge-primary">{{ day }}</span>
+                    {% endif %}
+                    {% endfor %}
+                    {% else %}
+                    <span class="text-muted">Not set</span>
+                    {% endif %}
+                </div>
+            </div>
+            {% if ld.preferences %}
+            <div class="form-group">
+                <label style="font-size:0.75rem">Max Hours/Week</label>
+                <div>{{ ld.preferences.max_hours_per_week or 20 }}h</div>
+            </div>
+            {% endif %}
+        </div>
+        {% if ld.courses %}
+        <table class="table-compact" style="width:100%;font-size:0.85rem">
+            <thead>
+                <tr>
+                    <th>Course</th>
+                    <th>Code</th>
+                    <th>Level</th>
+                    <th>Group</th>
+                    <th>Duration</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for c in ld.courses %}
+                <tr>
+                    <td>{{ c.name }}</td>
+                    <td><code>{{ c.code }}</code></td>
+                    <td><span class="badge badge-{{ c.level }}">{{ c.level }}</span></td>
+                    <td>{{ c.group_name }}</td>
+                    <td>{{ c.duration_hours }}h</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <p class="text-muted">No courses assigned yet.</p>
+        {% endif %}
+    </div>
+    {% endfor %}
+</div>
+{% endblock %}
