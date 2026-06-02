@@ -141,10 +141,12 @@ def dashboard():
         courses = db.execute("SELECT COUNT(*) as c FROM courses").fetchone()
         rooms = db.execute("SELECT COUNT(*) as c FROM rooms").fetchone()
         entries = db.execute("SELECT COUNT(*) as c FROM timetable_entries").fetchone()
+        timetable = get_timetable()
         data['lecturer_count'] = len(lecturers)
         data['course_count'] = courses['c']
         data['room_count'] = rooms['c']
         data['entry_count'] = entries['c']
+        data['timetable'] = timetable
         data['published'] = is_published()
         data['recent_logs'] = get_activity_logs(10)
         db.close()
@@ -183,7 +185,13 @@ def dashboard():
         """, (session['user_id'],)).fetchall()
         data['timetable'] = [dict(e) for e in entries]
         data['published'] = is_published()
-        data['groups'] = db.execute("SELECT DISTINCT group_name FROM courses").fetchall()
+        enrolled = db.execute("""
+            SELECT c.id, c.name, c.code, se.group_name
+            FROM student_enrollments se
+            JOIN courses c ON se.course_id = c.id
+            WHERE se.student_id = ?
+        """, (session['user_id'],)).fetchall()
+        data['enrolled_courses'] = [dict(e) for e in enrolled]
         db.close()
         return render_template('student_dashboard.html', **data)
 
@@ -332,9 +340,10 @@ def admin_delete_course(course_id):
 @login_required
 @role_required('admin')
 def admin_generate():
+    from scheduler import START_TIMES
     entries = generate_timetable()
     log_activity(session['user_id'], 'generate_timetable', f'Generated timetable with {len(entries)} entries')
-    return jsonify({'status': 'ok', 'count': len(entries)})
+    return jsonify({'status': 'ok', 'count': len(entries), 'start_times': len(START_TIMES)})
 
 
 @app.route('/admin/publish', methods=['POST'])
@@ -743,6 +752,100 @@ def api_chatbot():
     return jsonify({'response': response})
 
 
+@app.route('/api/student/available-courses')
+@login_required
+@role_required('student')
+def api_student_available_courses():
+    db = get_db()
+    courses = db.execute("""
+        SELECT DISTINCT c.id, c.name, c.code, c.group_name
+        FROM courses c
+        JOIN timetable_entries te ON te.course_id = c.id
+        WHERE te.published = 1
+        ORDER BY c.name
+    """).fetchall()
+    db.close()
+    return jsonify([dict(c) for c in courses])
+
+
+@app.route('/api/student/enroll', methods=['POST'])
+@login_required
+@role_required('student')
+def api_student_enroll():
+    data = request.get_json()
+    course_id = data.get('course_id')
+    if not course_id:
+        return jsonify({'error': 'Missing course_id'}), 400
+    db = get_db()
+    course = db.execute("SELECT id, name, group_name FROM courses WHERE id=?", (course_id,)).fetchone()
+    if not course:
+        db.close()
+        return jsonify({'error': 'Course not found'}), 404
+    existing = db.execute(
+        "SELECT id FROM student_enrollments WHERE student_id=? AND course_id=?",
+        (session['user_id'], course_id)
+    ).fetchone()
+    if existing:
+        db.close()
+        return jsonify({'error': 'Already enrolled'}), 400
+    db.execute(
+        "INSERT INTO student_enrollments (student_id, course_id, group_name) VALUES (?,?,?)",
+        (session['user_id'], course_id, course['group_name'])
+    )
+    db.commit()
+    db.close()
+    return jsonify({'status': 'ok', 'course_name': course['name']})
+
+
+@app.route('/api/student/drop', methods=['POST'])
+@login_required
+@role_required('student')
+def api_student_drop():
+    data = request.get_json()
+    course_id = data.get('course_id')
+    if not course_id:
+        return jsonify({'error': 'Missing course_id'}), 400
+    db = get_db()
+    db.execute(
+        "DELETE FROM student_enrollments WHERE student_id=? AND course_id=?",
+        (session['user_id'], course_id)
+    )
+    db.commit()
+    db.close()
+    return jsonify({'status': 'ok'})
+
+
+@app.route('/api/student/my-timetable')
+@login_required
+@role_required('student')
+def api_student_my_timetable():
+    db = get_db()
+    entries = db.execute("""
+        SELECT DISTINCT te.*, c.name as course_name, c.code, c.color,
+               u.full_name as lecturer_name, r.name as room_name
+        FROM timetable_entries te
+        JOIN courses c ON te.course_id = c.id
+        JOIN users u ON te.lecturer_id = u.id
+        JOIN rooms r ON te.room_id = r.id
+        JOIN student_enrollments se ON se.course_id = c.id AND se.student_id = ?
+        WHERE te.published = 1
+        ORDER BY te.day, te.start_time
+    """, (session['user_id'],)).fetchall()
+    enrolled = db.execute("""
+        SELECT c.id, c.name, c.code, se.group_name
+        FROM student_enrollments se
+        JOIN courses c ON se.course_id = c.id
+        WHERE se.student_id = ?
+    """, (session['user_id'],)).fetchall()
+    published = db.execute("SELECT value FROM app_settings WHERE key='timetable_published'").fetchone()
+    db.close()
+    return jsonify({
+        'timetable': [dict(e) for e in entries],
+        'enrolled_courses': [dict(e) for e in enrolled],
+        'published': bool(published and published['value'] == '1')
+    })
+
+
 @app.route('/api/export/ics')
 def api_export_ics():
     published_only = request.args.get('published', '1') == '1'
@@ -879,7 +982,9 @@ def api_mark_attendance():
     data = request.get_json()
     db = get_db()
     for record in data.get('records', []):
-        db.execute("""INSERT OR REPLACE INTO attendance_records
+        db.execute("DELETE FROM attendance_records WHERE timetable_entry_id=? AND student_id=?",
+                   (record['entry_id'], record['student_id']))
+        db.execute("""INSERT INTO attendance_records
             (timetable_entry_id, student_id, status, marked_by)
             VALUES (?,?,?,?)""",
                    (record['entry_id'], record['student_id'],
@@ -947,6 +1052,21 @@ def api_validate_entry():
 def _time_to_min(t):
     parts = t.split(':')
     return int(parts[0]) * 60 + int(parts[1])
+
+
+@app.route('/api/db-dump')
+@login_required
+@role_required('admin')
+def api_db_dump():
+    db = get_db()
+    tables = db.execute("SELECT name FROM sqlite_master WHERE type='table' ORDER BY name").fetchall()
+    result = {}
+    for t in tables:
+        name = t['name']
+        rows = db.execute(f'SELECT * FROM [{name}]').fetchall()
+        result[name] = [dict(r) for r in rows]
+    db.close()
+    return jsonify(result)
 
 
 if __name__ == '__main__':

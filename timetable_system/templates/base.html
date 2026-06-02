@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{% block title %}UniTimetable Pro{% endblock %}</title>
+    <title>{% block title %}MyBuse Course Timetable{% endblock %}</title>
     <link rel="stylesheet" href="/static/style.css">
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📚</text></svg>">
@@ -14,10 +14,10 @@
         {% if session.user_id %}
         <aside class="sidebar" id="sidebar">
             <div class="sidebar-brand">
-                <div class="logo">UT</div>
+                <div class="logo">MB</div>
                 <div>
-                    <h2>UniTimetable</h2>
-                    <small>University Platform</small>
+                    <h2>MyBuse</h2>
+                    <small>Course Timetable</small>
                 </div>
             </div>
             <div class="sidebar-user">

@@ -3,16 +3,16 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>UniTimetable Pro - Login</title>
+    <title>MyBuse Course Timetable - Login</title>
     <link rel="stylesheet" href="/static/style.css">
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📚</text></svg>">
 </head>
 <body>
     <div class="login-container">
         <div class="login-card">
-            <div class="login-logo">UT</div>
-            <h1>UniTimetable Pro</h1>
-            <p class="subtitle">AI-Powered University Timetable Platform</p>
+            <div class="login-logo">MB</div>
+            <h1>MyBuse Course Timetable</h1>
+            <p class="subtitle">AI-Powered Timetable Management System</p>
             {% if error %}
             <div class="alert alert-error">{{ error }}</div>
             {% endif %}
@@ -30,12 +30,6 @@
             <p style="text-align:center; margin-top: 16px;">
                 Don't have an account? <a href="{{ url_for('register') }}">Create one</a>
             </p>
-            <div class="login-info">
-                <p><strong>Demo Accounts:</strong></p>
-                <p>Admin: <code>admin</code> / <code>admin123</code></p>
-                <p>Lecturer: <code>lecturer1</code> / <code>pass123</code></p>
-                <p>Student: <code>student1</code> / <code>pass123</code></p>
-            </div>
         </div>
     </div>
 </body>

@@ -146,7 +146,6 @@ def find_alternative_slot(entry):
                 (lecturer_id = ?) OR (room_id = ?) OR (group_name = ?)
             )
         """, (d, entry.get('lecturer_id'), entry.get('room_id'), entry.get('group_name'))).fetchall()
-        db.close()
 
         taken = [( _time_to_min(o['start_time']), _time_to_min(o['end_time'])) for o in occupied]
 
@@ -160,9 +159,11 @@ def find_alternative_slot(entry):
                     conflict = True
                     break
             if not conflict:
+                db.close()
                 h1, m1 = divmod(slot_start, 60)
                 h2, m2 = divmod(slot_end, 60)
                 return f"{d} at {h1:02d}:{m1:02d}-{h2:02d}:{m2:02d}"
+    db.close()
     return "a different time slot"
 
 

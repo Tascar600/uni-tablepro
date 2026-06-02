@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}My Timetable - UniTimetable Pro{% endblock %}
+{% block title %}My Timetable - MyBuse Course Timetable{% endblock %}
 {% block page_title %}My Timetable{% endblock %}
 {% block page_subtitle %}Your personalized course schedule{% endblock %}
 
@@ -8,6 +8,29 @@
 <div class="alert alert-warning">Timetable has not been published yet. Please check back later.</div>
 {% endif %}
 
+<div class="card mb-3">
+    <div class="card-header">
+        <h3>My Courses</h3>
+    </div>
+    <div class="flex gap-1" style="padding:1rem;align-items:center;flex-wrap:wrap;">
+        <select id="courseSelect" style="flex:1;min-width:200px;padding:0.5rem 0.75rem;background:var(--bg-input);border:1px solid var(--border-color);border-radius:var(--radius-sm);color:var(--text-primary);font-size:0.85rem;">
+            <option value="">-- Select a course --</option>
+        </select>
+        <button class="btn btn-primary btn-sm" onclick="addCourse()">+ Add Course</button>
+    </div>
+    <div id="enrolledList" style="padding:0 1rem 1rem 1rem;display:flex;flex-wrap:wrap;gap:0.5rem;">
+        {% for ec in enrolled_courses %}
+        <span style="display:inline-flex;align-items:center;gap:0.4rem;background:var(--accent-primary);color:#fff;padding:0.3rem 0.7rem;border-radius:var(--radius-sm);font-size:0.82rem;">
+            {{ ec.name }} ({{ ec.code }})
+            <span onclick="dropCourse({{ ec.id }})" style="cursor:pointer;font-weight:bold;opacity:0.8;">&times;</span>
+        </span>
+        {% else %}
+        <span class="text-muted" style="font-size:0.85rem;">No courses selected yet. Add courses above to see your timetable.</span>
+        {% endfor %}
+    </div>
+</div>
+
+<div id="timetableSection">
 {% if timetable %}
 <div class="card">
     <div class="card-header">
@@ -18,7 +41,7 @@
     </div>
 
     <div class="timetable-container">
-        <div class="timetable-grid">
+        <div class="timetable-grid" id="timetableGrid">
             <div class="timetable-header">Time</div>
             {% set days = ['Monday','Tuesday','Wednesday','Thursday','Friday'] %}
             {% for day in days %}
@@ -53,6 +76,7 @@
 <div class="grid-2">
     <div class="card">
         <div class="card-header"><h3>Day-wise Schedule</h3></div>
+        <div id="daywiseSchedule">
         {% set days_of_week = ['Monday','Tuesday','Wednesday','Thursday','Friday'] %}
         {% for day in days_of_week %}
         <div class="mb-2">
@@ -72,14 +96,15 @@
             {% endif %}
         </div>
         {% endfor %}
+        </div>
     </div>
 
     <div class="card">
         <div class="card-header"><h3>Quick Info</h3></div>
+        <div id="quickInfoStats">
         {% set total_hours = namespace(value=0) %}
         {% set total_classes = namespace(value=0) %}
         {% for e in timetable %}
-        {% set ns = namespace(h=0) %}
         {% set start_h = e.start_time.split(':')[0]|int %}
         {% set end_h = e.end_time.split(':')[0]|int %}
         {% set total_hours.value = total_hours.value + (end_h - start_h) %}
@@ -103,6 +128,7 @@
                 <div class="stat-label">Rooms Used</div>
             </div>
         </div>
+        </div>
 
         <div class="mt-3">
             <h4 class="mb-1">Export & Share</h4>
@@ -115,7 +141,7 @@
     </div>
 </div>
 {% elif published %}
-<div class="card">
+<div class="card" id="emptyTimetable">
     <div class="empty-state">
         <div class="empty-icon">&#128197;</div>
         <h3>Timetable is empty</h3>
@@ -123,4 +149,242 @@
     </div>
 </div>
 {% endif %}
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+let currentTimetable = {{ timetable|tojson|default('[]') }};
+let currentEnrolled = {{ enrolled_courses|tojson|default('[]') }};
+let allAvailable = [];
+
+function escapeHtml(s) {
+    const d = document.createElement('div');
+    d.textContent = s;
+    return d.innerHTML;
+}
+
+function loadAvailableCourses() {
+    fetch('/api/student/available-courses')
+        .then(r => r.json())
+        .then(courses => {
+            allAvailable = courses;
+            rebuildDropdown();
+        });
+}
+
+function rebuildDropdown() {
+    const sel = document.getElementById('courseSelect');
+    const enrolledIds = new Set(currentEnrolled.map(c => c.id));
+    sel.innerHTML = '<option value="">-- Select a course --</option>';
+    allAvailable.forEach(c => {
+        if (!enrolledIds.has(c.id)) {
+            const opt = document.createElement('option');
+            opt.value = c.id;
+            opt.textContent = c.name + ' (' + c.code + ')';
+            sel.appendChild(opt);
+        }
+    });
+}
+
+function renderEnrolledList() {
+    const el = document.getElementById('enrolledList');
+    if (currentEnrolled.length === 0) {
+        el.innerHTML = '<span class="text-muted" style="font-size:0.85rem;">No courses selected yet. Add courses above to see your timetable.</span>';
+        return;
+    }
+    el.innerHTML = currentEnrolled.map(c =>
+        `<span style="display:inline-flex;align-items:center;gap:0.4rem;background:var(--accent-primary);color:#fff;padding:0.3rem 0.7rem;border-radius:var(--radius-sm);font-size:0.82rem;">
+            ${escapeHtml(c.name)} (${escapeHtml(c.code)})
+            <span onclick="dropCourse(${c.id})" style="cursor:pointer;font-weight:bold;opacity:0.8;">&times;</span>
+        </span>`
+    ).join('');
+}
+
+function renderTimetable() {
+    const section = document.getElementById('timetableSection');
+    if (currentTimetable.length === 0) {
+        section.innerHTML =
+            `<div class="card" id="emptyTimetable">
+                <div class="empty-state">
+                    <div class="empty-icon">&#128197;</div>
+                    <h3>Timetable is empty</h3>
+                    <p class="text-muted">The timetable is published but has no entries yet.</p>
+                </div>
+            </div>`;
+        return;
+    }
+
+    const days = ['Monday','Tuesday','Wednesday','Thursday','Friday'];
+    const slots = ['07:00-09:00','09:00-11:00','11:00-13:00','14:00-16:00','16:00-18:00'];
+
+    let gridHtml = '<div class="timetable-header">Time</div>';
+    days.forEach(d => { gridHtml += '<div class="timetable-header">' + d.slice(0,3) + '</div>'; });
+
+    slots.forEach(slot => {
+        const s = slot.split('-');
+        gridHtml += '<div class="timetable-time">' + s[0] + '<br><small>' + s[1] + '</small></div>';
+        days.forEach(day => {
+            const entries = currentTimetable.filter(e => e.day === day && e.start_time >= s[0] && e.end_time <= s[1]);
+            gridHtml += '<div class="timetable-cell">';
+            entries.forEach(e => {
+                gridHtml +=
+                    `<div class="timetable-event" style="background:${e.color || '#4f8cff'}"
+                          data-lecturer="${escapeHtml(e.lecturer_name)}"
+                          data-room="${escapeHtml(e.room_name)}"
+                          data-group="${escapeHtml(e.group_name)}"
+                          data-course="${escapeHtml(e.course_name)}">
+                        <div class="event-title">${escapeHtml(e.course_name)}</div>
+                        <div class="event-info">${escapeHtml(e.start_time)}-${escapeHtml(e.end_time)} | ${escapeHtml(e.room_name)}</div>
+                        <div class="event-info">${escapeHtml(e.lecturer_name)}</div>
+                    </div>`;
+            });
+            gridHtml += '</div>';
+        });
+    });
+
+    const cardHtml =
+        `<div class="card">
+            <div class="card-header">
+                <h3>My Weekly Schedule</h3>
+                <div class="flex gap-1">
+                    <input type="text" id="searchInput" placeholder="&#128269; Search..." style="padding:0.5rem 0.75rem;background:var(--bg-input);border:1px solid var(--border-color);border-radius:var(--radius-sm);color:var(--text-primary);font-size:0.85rem;width:200px">
+                </div>
+            </div>
+            <div class="timetable-container">
+                <div class="timetable-grid" id="timetableGrid">${gridHtml}</div>
+            </div>
+        </div>`;
+
+    section.innerHTML = cardHtml + renderDaywiseHtml() + renderQuickInfoHtml();
+}
+
+function renderDaywiseHtml() {
+    const days = ['Monday','Tuesday','Wednesday','Thursday','Friday'];
+    let html = '<div class="grid-2"><div class="card"><div class="card-header"><h3>Day-wise Schedule</h3></div><div id="daywiseSchedule">';
+    days.forEach(day => {
+        const entries = currentTimetable.filter(e => e.day === day);
+        html += `<div class="mb-2"><h4 style="font-size:0.9rem;color:var(--accent-primary);margin-bottom:0.35rem;border-left:3px solid var(--accent-primary);padding-left:0.5rem;">${day}</h4>`;
+        if (entries.length) {
+            html += '<div style="font-size:0.85rem">';
+            entries.forEach(e => {
+                html += `<div class="flex-between" style="padding:0.3rem 0;border-bottom:1px solid var(--border-color)">
+                    <span><strong>${escapeHtml(e.start_time)}-${escapeHtml(e.end_time)}</strong> ${escapeHtml(e.course_name)}</span>
+                    <span class="text-muted">${escapeHtml(e.room_name)}</span>
+                </div>`;
+            });
+            html += '</div>';
+        } else {
+            html += '<p class="text-muted" style="font-size:0.82rem">No classes scheduled</p>';
+        }
+        html += '</div>';
+    });
+    html += '</div></div>';
+    html += renderQuickInfoHtml() + '</div>';
+    return html;
+}
+
+function renderQuickInfoHtml() {
+    let totalHours = 0, totalClasses = 0;
+    const lecturers = new Set(), rooms = new Set();
+    currentTimetable.forEach(e => {
+        const sh = parseInt(e.start_time.split(':')[0]);
+        const eh = parseInt(e.end_time.split(':')[0]);
+        totalHours += (eh - sh);
+        totalClasses++;
+        lecturers.add(e.lecturer_name);
+        rooms.add(e.room_name);
+    });
+
+    return `<div class="card">
+        <div class="card-header"><h3>Quick Info</h3></div>
+        <div id="quickInfoStats">
+            <div class="stats-grid" style="grid-template-columns:1fr 1fr">
+                <div class="stat-card" style="text-align:center;padding:1rem">
+                    <div class="stat-number">${totalClasses}</div>
+                    <div class="stat-label">Weekly Classes</div>
+                </div>
+                <div class="stat-card" style="text-align:center;padding:1rem">
+                    <div class="stat-number">${totalHours}</div>
+                    <div class="stat-label">Hours/Week</div>
+                </div>
+                <div class="stat-card" style="text-align:center;padding:1rem">
+                    <div class="stat-number">${lecturers.size}</div>
+                    <div class="stat-label">Lecturers</div>
+                </div>
+                <div class="stat-card" style="text-align:center;padding:1rem">
+                    <div class="stat-number">${rooms.size}</div>
+                    <div class="stat-label">Rooms Used</div>
+                </div>
+            </div>
+        </div>
+        <div class="mt-3">
+            <h4 class="mb-1">Export & Share</h4>
+            <div class="btn-group">
+                <button class="btn btn-sm btn-ghost" onclick="exportICS()">&#128197; Google Calendar</button>
+                <button class="btn btn-sm btn-ghost" onclick="exportCSV()">&#128196; CSV</button>
+                <button class="btn btn-sm btn-ghost" onclick="shareTimetable()">&#128279; Share</button>
+            </div>
+        </div>
+    </div>`;
+}
+
+function refreshTimetable() {
+    return fetch('/api/student/my-timetable')
+        .then(r => r.json())
+        .then(data => {
+            currentTimetable = data.timetable || [];
+            currentEnrolled = data.enrolled_courses || [];
+            renderEnrolledList();
+            renderTimetable();
+            rebuildDropdown();
+            initSearchFilter();
+        });
+}
+
+function addCourse() {
+    const sel = document.getElementById('courseSelect');
+    const courseId = sel.value;
+    if (!courseId) return;
+
+    fetch('/api/student/enroll', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({course_id: parseInt(courseId)})
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.error) { alert(data.error); return; }
+        sel.value = '';
+        refreshTimetable();
+    });
+}
+
+function dropCourse(courseId) {
+    if (!confirm('Remove this course from your timetable?')) return;
+    fetch('/api/student/drop', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({course_id: courseId})
+    })
+    .then(r => r.json())
+    .then(() => { refreshTimetable(); });
+}
+
+function initSearchFilter() {
+    const input = document.getElementById('searchInput');
+    if (!input) return;
+    input.addEventListener('input', function() {
+        const q = this.value.toLowerCase();
+        document.querySelectorAll('.timetable-event').forEach(el => {
+            el.style.display = el.textContent.toLowerCase().includes(q) ? '' : 'none';
+        });
+    });
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    loadAvailableCourses();
+    initSearchFilter();
+});
+</script>
 {% endblock %}
