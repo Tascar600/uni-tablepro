@@ -341,9 +341,13 @@ def admin_delete_course(course_id):
 @role_required('admin')
 def admin_generate():
     from scheduler import START_TIMES
-    entries = generate_timetable()
+    entries, unassigned = generate_timetable()
     log_activity(session['user_id'], 'generate_timetable', f'Generated timetable with {len(entries)} entries')
-    return jsonify({'status': 'ok', 'count': len(entries), 'start_times': len(START_TIMES)})
+    msg = f'Generated timetable with {len(entries)} entries'
+    if unassigned:
+        names = ', '.join(f'{c["course_name"]} ({c["reason"]})' for c in unassigned)
+        msg += f'. Courses NOT placed: {names}'
+    return jsonify({'status': 'ok', 'count': len(entries), 'unassigned': unassigned, 'start_times': len(START_TIMES)})
 
 
 @app.route('/admin/publish', methods=['POST'])

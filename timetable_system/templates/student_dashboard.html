@@ -48,13 +48,13 @@
             <div class="timetable-header">{{ day[:3] }}</div>
             {% endfor %}
 
-            {% set slots = ['07:00-09:00','09:00-11:00','11:00-13:00','14:00-16:00','16:00-18:00'] %}
+            {% set slots = ['07:00-09:00','09:00-11:00','11:00-13:00','13:00-15:00','15:00-18:00'] %}
             {% for slot in slots %}
             {% set s = slot.split('-') %}
             <div class="timetable-time">{{ s[0] }}<br><small>{{ s[1] }}</small></div>
             {% for day in days %}
             <div class="timetable-cell">
-                {% for entry in timetable if entry.day == day and entry.start_time >= s[0] and entry.end_time <= s[1] %}
+                {% for entry in timetable if entry.day == day and entry.start_time >= s[0] and entry.start_time < s[1] %}
                 <div class="timetable-event"
                      style="background:{{ entry.color or '#4f8cff' }}"
                      data-lecturer="{{ entry.lecturer_name }}"
@@ -216,7 +216,7 @@ function renderTimetable() {
     }
 
     const days = ['Monday','Tuesday','Wednesday','Thursday','Friday'];
-    const slots = ['07:00-09:00','09:00-11:00','11:00-13:00','14:00-16:00','16:00-18:00'];
+    const slots = ['07:00-09:00','09:00-11:00','11:00-13:00','13:00-15:00','15:00-18:00'];
 
     let gridHtml = '<div class="timetable-header">Time</div>';
     days.forEach(d => { gridHtml += '<div class="timetable-header">' + d.slice(0,3) + '</div>'; });
@@ -225,7 +225,7 @@ function renderTimetable() {
         const s = slot.split('-');
         gridHtml += '<div class="timetable-time">' + s[0] + '<br><small>' + s[1] + '</small></div>';
         days.forEach(day => {
-            const entries = currentTimetable.filter(e => e.day === day && e.start_time >= s[0] && e.end_time <= s[1]);
+            const entries = currentTimetable.filter(e => e.day === day && e.start_time >= s[0] && e.start_time < s[1]);
             gridHtml += '<div class="timetable-cell">';
             entries.forEach(e => {
                 gridHtml +=

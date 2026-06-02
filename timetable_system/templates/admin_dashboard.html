@@ -97,13 +97,13 @@
             <div class="timetable-header">{{ day }}</div>
             {% endfor %}
 
-            {% set slots = ['07:00-09:00','09:00-11:00','11:00-13:00','14:00-16:00','16:00-18:00'] %}
+            {% set slots = ['07:00-09:00','09:00-11:00','11:00-13:00','13:00-15:00','15:00-18:00'] %}
             {% for slot in slots %}
             {% set s = slot.split('-') %}
             <div class="timetable-time">{{ s[0] }}<br><small>{{ s[1] }}</small></div>
             {% for day in days %}
             <div class="timetable-cell" data-day="{{ day }}" data-time="{{ slot }}">
-                {% for entry in timetable if entry.day == day and entry.start_time >= s[0] and entry.end_time <= s[1] %}
+                {% for entry in timetable if entry.day == day and entry.start_time >= s[0] and entry.start_time < s[1] %}
                 <div class="timetable-event"
                      data-entry-id="{{ entry.id }}"
                      data-lecturer-id="{{ entry.lecturer_id }}"

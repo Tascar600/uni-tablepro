@@ -169,6 +169,8 @@ def generate_timetable():
     entries = []
     lecturer_hours = {lec['id']: 0 for lec in lecturers}
 
+    unassigned = []
+
     for course in courses_list:
         lec_id = course['lecturer_id']
         prefs = lecture_prefs.get(lec_id, {})
@@ -181,6 +183,7 @@ def generate_timetable():
         course_duration_min = int(course_duration * 60)
 
         assigned_flag = False
+        reason = None
 
         trial_times = []
         for d in pref_days:
@@ -239,6 +242,7 @@ def generate_timetable():
 
             new_hours = lecturer_hours.get(lec_id, 0) + course_duration
             if new_hours > prefs.get('max_hours', 40):
+                reason = f"Lecturer max hours ({prefs.get('max_hours', 40)}) exceeded"
                 continue
 
             valid_rooms = list(rooms)
@@ -279,6 +283,9 @@ def generate_timetable():
                     assigned_flag = True
                     placed = True
                     break
+
+        if not assigned_flag and reason is None:
+            reason = "No available time slot in preferred days"
 
         if not assigned_flag:
             fallback_times = []
@@ -350,7 +357,16 @@ def generate_timetable():
                         })
                         entries.append(entry_data)
                         assigned_flag = True
+                        reason = None
                         break
+
+            if not assigned_flag:
+                unassigned.append({
+                    'course_name': course['name'],
+                    'code': course['code'],
+                    'lecturer_name': course.get('lecturer_name', 'N/A'),
+                    'reason': reason or 'Could not find any available time slot',
+                })
 
     efficiency = calculate_efficiency(entries)
     db.execute("UPDATE app_settings SET value=? WHERE key='efficiency_score'", (str(efficiency),))
@@ -364,7 +380,7 @@ def generate_timetable():
 
     db.commit()
     db.close()
-    return entries
+    return entries, unassigned
 
 
 def get_timetable(published_only=False, entry_id=None):
