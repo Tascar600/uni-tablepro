@@ -6,6 +6,15 @@
     <title>MyBuse Course Timetable - Login</title>
     <link rel="stylesheet" href="/static/style.css">
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📚</text></svg>">
+    <style>
+        .role-selector { display:flex; gap:0.75rem; margin-bottom:1.5rem; }
+        .role-btn { flex:1; padding:1rem 0.5rem; border:2px solid var(--border-color); border-radius:var(--radius-md); background:transparent; color:var(--text-primary); cursor:pointer; text-align:center; transition:all 0.2s; font-size:0.85rem; }
+        .role-btn:hover { border-color:var(--accent-primary); background:rgba(79,140,255,0.08); }
+        .role-btn.active { border-color:var(--accent-primary); background:rgba(79,140,255,0.12); font-weight:600; }
+        .role-btn .icon { font-size:1.6rem; display:block; margin-bottom:0.3rem; }
+        .login-form { display:none; }
+        .login-form.active { display:block; }
+    </style>
 </head>
 <body>
     <div class="login-container">
@@ -16,21 +25,75 @@
             {% if error %}
             <div class="alert alert-error">{{ error }}</div>
             {% endif %}
-            <form method="POST">
+
+            <div class="role-selector">
+                <div class="role-btn active" data-role="student" onclick="selectRole('student')">
+                    <span class="icon">&#127891;</span> Student
+                </div>
+                <div class="role-btn" data-role="lecturer" onclick="selectRole('lecturer')">
+                    <span class="icon">&#128218;</span> Lecturer
+                </div>
+                <div class="role-btn" data-role="admin" onclick="selectRole('admin')">
+                    <span class="icon">&#128272;</span> Admin
+                </div>
+            </div>
+
+            <form method="POST" class="login-form active" id="form-student">
+                <input type="hidden" name="role" value="student">
                 <div class="form-group">
-                    <label for="username">Username</label>
-                    <input type="text" id="username" name="username" required placeholder="Enter your username">
+                    <label for="username-student">Username</label>
+                    <input type="text" id="username-student" name="username" required placeholder="Enter your username">
                 </div>
                 <div class="form-group">
-                    <label for="password">Password</label>
-                    <input type="password" id="password" name="password" required placeholder="Enter your password">
+                    <label for="password-student">Password</label>
+                    <input type="password" id="password-student" name="password" required placeholder="Enter your password">
                 </div>
-                <button type="submit" class="btn btn-primary btn-block btn-lg">Sign In</button>
+                <button type="submit" class="btn btn-primary btn-block btn-lg">Sign In as Student</button>
             </form>
-            <p style="text-align:center; margin-top: 16px;">
-                Don't have an account? <a href="{{ url_for('register') }}">Create one</a>
-            </p>
+
+            <form method="POST" class="login-form" id="form-lecturer">
+                <input type="hidden" name="role" value="lecturer">
+                <div class="form-group">
+                    <label for="username-lecturer">Username</label>
+                    <input type="text" id="username-lecturer" name="username" required placeholder="Enter your username">
+                </div>
+                <div class="form-group">
+                    <label for="password-lecturer">Password</label>
+                    <input type="password" id="password-lecturer" name="password" required placeholder="Enter your password">
+                </div>
+                <button type="submit" class="btn btn-primary btn-block btn-lg">Sign In as Lecturer</button>
+            </form>
+
+            <form method="POST" class="login-form" id="form-admin">
+                <input type="hidden" name="role" value="admin">
+                <div class="form-group">
+                    <label for="admin-password">Admin Password</label>
+                    <input type="password" id="admin-password" name="password" required placeholder="Enter admin password">
+                </div>
+                <button type="submit" class="btn btn-primary btn-block btn-lg">Access Admin Dashboard</button>
+            </form>
+
+            <div id="register-link" style="text-align:center; margin-top: 16px;">
+                Don't have an account? <a href="{{ url_for('register') }}?role=student">Create one</a>
+            </div>
         </div>
     </div>
+
+    <script>
+        function selectRole(role) {
+            document.querySelectorAll('.role-btn').forEach(b => b.classList.remove('active'));
+            document.querySelector('.role-btn[data-role="'+role+'"]').classList.add('active');
+            document.querySelectorAll('.login-form').forEach(f => f.classList.remove('active'));
+            document.getElementById('form-'+role).classList.add('active');
+
+            var link = document.getElementById('register-link');
+            if (role === 'admin') {
+                link.style.display = 'none';
+            } else {
+                link.style.display = 'block';
+                link.innerHTML = 'Don\'t have an account? <a href="{{ url_for('register') }}?role='+role+'">Create one</a>';
+            }
+        }
+    </script>
 </body>
 </html>

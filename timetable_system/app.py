@@ -77,11 +77,27 @@ def index():
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
-        username = request.form['username']
-        password = request.form['password']
+        role = request.form.get('role', 'student')
+        username = request.form.get('username', '').strip()
+        password = request.form.get('password', '').strip()
+
+        if role == 'admin':
+            if password == 'admin123':
+                db = get_db()
+                user = db.execute("SELECT * FROM users WHERE role='admin' AND is_active=1").fetchone()
+                db.close()
+                if not user:
+                    return render_template('login.html', error='Admin account not found')
+                session['user_id'] = user['id']
+                session['role'] = user['role']
+                session['full_name'] = user['full_name']
+                log_activity(user['id'], 'login', 'Admin logged in')
+                return redirect(url_for('dashboard'))
+            return render_template('login.html', error='Invalid admin password')
+
         db = get_db()
-        user = db.execute("SELECT * FROM users WHERE username=? AND password=? AND is_active=1",
-                          (username, password)).fetchone()
+        user = db.execute("SELECT * FROM users WHERE username=? AND password=? AND role=? AND is_active=1",
+                          (username, password, role)).fetchone()
         db.close()
         if user:
             session['user_id'] = user['id']
@@ -89,12 +105,13 @@ def login():
             session['full_name'] = user['full_name']
             log_activity(user['id'], 'login', 'User logged in')
             return redirect(url_for('dashboard'))
-        return render_template('login.html', error='Invalid credentials')
+        return render_template('login.html', error=f'Invalid {role} credentials')
     return render_template('login.html')
 
 
 @app.route('/register', methods=['GET', 'POST'])
 def register():
+    role = request.args.get('role', 'student')
     if request.method == 'POST':
         username = request.form['username'].strip()
         password = request.form['password']
@@ -102,7 +119,7 @@ def register():
         email = request.form.get('email', '').strip()
         role = request.form.get('role', 'student')
         if not username or not password or not full_name:
-            return render_template('register.html', error='All fields are required')
+            return render_template('register.html', error='All fields are required', role=role, role_label=role.title())
         db = get_db()
         try:
             db.execute("INSERT INTO users (username, password, role, full_name, email) VALUES (?,?,?,?,?)",
@@ -117,8 +134,8 @@ def register():
             return redirect(url_for('dashboard'))
         except sqlite3.IntegrityError:
             db.close()
-            return render_template('register.html', error='Username already taken')
-    return render_template('register.html')
+            return render_template('register.html', error='Username already taken', role=role, role_label=role.title())
+    return render_template('register.html', role=role, role_label=role.title())
 
 
 @app.route('/logout')

@@ -11,12 +11,13 @@
     <div class="login-container">
         <div class="login-card">
             <div class="login-logo">MB</div>
-            <h1>Create Account</h1>
+            <h1>Create {{ role_label }} Account</h1>
             <p class="subtitle">MyBuse Course Timetable</p>
             {% if error %}
             <div class="alert alert-error">{{ error }}</div>
             {% endif %}
             <form method="POST">
+                <input type="hidden" name="role" value="{{ role }}">
                 <div class="form-group">
                     <label for="full_name">Full Name</label>
                     <input type="text" id="full_name" name="full_name" required placeholder="Enter your full name">
@@ -33,8 +34,7 @@
                     <label for="password">Password</label>
                     <input type="password" id="password" name="password" required placeholder="Choose a password">
                 </div>
-                <input type="hidden" name="role" value="student">
-                <button type="submit" class="btn btn-primary btn-block btn-lg">Create Account</button>
+                <button type="submit" class="btn btn-primary btn-block btn-lg">Create {{ role_label }} Account</button>
             </form>
             <p style="text-align:center; margin-top: 16px;">
                 Already have an account? <a href="{{ url_for('login') }}">Sign In</a>
