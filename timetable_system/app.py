@@ -343,6 +343,7 @@ def admin_add_course():
 def admin_delete_course(course_id):
     db = get_db()
     course = db.execute("SELECT * FROM courses WHERE id=?", (course_id,)).fetchone()
+    db.execute("DELETE FROM student_enrollments WHERE course_id=?", (course_id,))
     db.execute("DELETE FROM timetable_entries WHERE course_id=?", (course_id,))
     db.execute("DELETE FROM courses WHERE id=?", (course_id,))
     db.commit()
@@ -358,13 +359,16 @@ def admin_delete_course(course_id):
 @role_required('admin')
 def admin_generate():
     from scheduler import START_TIMES
-    entries, unassigned = generate_timetable()
-    log_activity(session['user_id'], 'generate_timetable', f'Generated timetable with {len(entries)} entries')
-    msg = f'Generated timetable with {len(entries)} entries'
-    if unassigned:
-        names = ', '.join(f'{c["course_name"]} ({c["reason"]})' for c in unassigned)
-        msg += f'. Courses NOT placed: {names}'
-    return jsonify({'status': 'ok', 'count': len(entries), 'unassigned': unassigned, 'start_times': len(START_TIMES)})
+    try:
+        entries, unassigned = generate_timetable()
+        log_activity(session['user_id'], 'generate_timetable', f'Generated timetable with {len(entries)} entries')
+        msg = f'Generated timetable with {len(entries)} entries'
+        if unassigned:
+            names = ', '.join(f'{c["course_name"]} ({c["reason"]})' for c in unassigned)
+            msg += f'. Courses NOT placed: {names}'
+        return jsonify({'status': 'ok', 'count': len(entries), 'unassigned': unassigned, 'start_times': len(START_TIMES)})
+    except Exception as e:
+        return jsonify({'status': 'error', 'error': str(e)}), 500
 
 
 @app.route('/admin/publish', methods=['POST'])
@@ -1090,7 +1094,9 @@ def api_db_dump():
     return jsonify(result)
 
 
+# Initialize database on startup (required for Render/Gunicorn)
+init_db()
+
 if __name__ == '__main__':
-    init_db()
     seed_data()
     app.run(debug=False, port=5000)

@@ -14,14 +14,23 @@ class _DB:
         if self.pg:
             import psycopg2.extras
             cur = self.conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
+            try:
+                if params is not None:
+                    s = sql.replace('?', '%s')
+                    cur.execute(s, params)
+                else:
+                    cur.execute(sql)
+                return cur
+            except:
+                cur.close()
+                raise
         else:
             cur = self.conn.cursor()
-        if params is not None:
-            s = sql.replace('?', '%s') if self.pg else sql
-            cur.execute(s, params)
-        else:
-            cur.execute(sql)
-        return cur
+            if params is not None:
+                cur.execute(sql, params)
+            else:
+                cur.execute(sql)
+            return cur
 
     def executescript(self, sql):
         if self.pg:

@@ -124,6 +124,9 @@ def generate_timetable():
         FROM courses c JOIN users u ON c.lecturer_id = u.id
     """).fetchall()
 
+    db.execute("DELETE FROM substitute_allocations")
+    db.execute("DELETE FROM conflict_resolutions")
+    db.execute("DELETE FROM timetable_versions")
     db.execute("DELETE FROM timetable_entries")
     db.execute("UPDATE app_settings SET value='0' WHERE key='timetable_published'")
 
