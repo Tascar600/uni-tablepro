@@ -262,13 +262,23 @@ function generateTimetable() {
     fetch('/admin/generate', { method: 'POST' })
         .then(r => r.json())
         .then(data => {
+            if (data.status === 'error') {
+                if (status) {
+                    status.className = 'alert alert-error';
+                    status.textContent = 'Error: ' + (data.error || 'Unknown error');
+                    status.style.display = 'block';
+                }
+                btn.disabled = false;
+                btn.textContent = 'Generate Timetable';
+                return;
+            }
             if (status) {
                 status.className = 'alert alert-success';
                 status.textContent = `Timetable generated with ${data.count} entries!`;
                 status.style.display = 'block';
             }
             showToast(`Generated ${data.count} entries!`, 'success');
-            setTimeout(() => location.reload(), 1500);
+            setTimeout(() => { window.location.href = '/dashboard'; }, 1000);
         })
         .catch(() => {
             if (status) {
