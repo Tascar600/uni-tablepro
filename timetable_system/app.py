@@ -243,6 +243,47 @@ def admin_lecturers():
     return render_template('admin_lecturers.html', lecturers=all_data, departments=[dict(d) for d in depts])
 
 
+@app.route('/admin/add-lecturer', methods=['POST'])
+@login_required
+@role_required('admin')
+def admin_add_lecturer():
+    username = request.form['username'].strip()
+    password = request.form['password']
+    full_name = request.form['full_name'].strip()
+    email = request.form.get('email', '').strip()
+    db = get_db()
+    try:
+        db.execute("INSERT INTO users (username, password, role, full_name, email) VALUES (?,?,?,?,?)",
+                   (username, password, 'lecturer', full_name, email))
+        db.commit()
+        log_activity(session['user_id'], 'add_lecturer', f'Added lecturer: {full_name}')
+        flash('Lecturer added successfully!', 'success')
+    except Exception as e:
+        flash(f'Error: {str(e)}', 'error')
+    db.close()
+    return redirect(url_for('admin_lecturers'))
+
+
+@app.route('/admin/delete-lecturer/<int:lecturer_id>', methods=['POST'])
+@login_required
+@role_required('admin')
+def admin_delete_lecturer(lecturer_id):
+    db = get_db()
+    lecturer = db.execute("SELECT * FROM users WHERE id=? AND role='lecturer'", (lecturer_id,)).fetchone()
+    if lecturer:
+        db.execute("DELETE FROM student_enrollments WHERE course_id IN (SELECT id FROM courses WHERE lecturer_id=?)", (lecturer_id,))
+        db.execute("DELETE FROM timetable_entries WHERE lecturer_id=?", (lecturer_id,))
+        db.execute("DELETE FROM courses WHERE lecturer_id=?", (lecturer_id,))
+        db.execute("DELETE FROM lecturer_preferences WHERE user_id=?", (lecturer_id,))
+        db.execute("DELETE FROM lecturer_availability WHERE lecturer_id=?", (lecturer_id,))
+        db.execute("DELETE FROM users WHERE id=?", (lecturer_id,))
+        db.commit()
+        log_activity(session['user_id'], 'delete_lecturer', f'Deleted lecturer: {lecturer["full_name"]}')
+        flash('Lecturer deleted.', 'success')
+    db.close()
+    return redirect(url_for('admin_lecturers'))
+
+
 @app.route('/admin/rooms')
 @login_required
 @role_required('admin')
