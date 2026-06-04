@@ -206,9 +206,14 @@ for day, slot_idx, venue, group, codes_str, color in entries_data:
             (cid, lecturer, room_id, day, start_fmt, end_fmt, group, 1))
         entry_id += 1
 
-db.execute("INSERT OR REPLACE INTO app_settings (key, value) VALUES (?,?)", ('timetable_published', '1'))
-for k, v in [('lunch_start','13:00'), ('lunch_end','13:30'), ('efficiency_score','0')]:
-    db.execute("INSERT OR IGNORE INTO app_settings (key, value) VALUES (?,?)", (k, v))
+if db.pg:
+    db.execute("INSERT INTO app_settings (key, value) VALUES (%s, %s) ON CONFLICT (key) DO UPDATE SET value = %s", ('timetable_published', '1', '1'))
+    for k, v in [('lunch_start','13:00'), ('lunch_end','13:30'), ('efficiency_score','0')]:
+        db.execute("INSERT INTO app_settings (key, value) VALUES (%s, %s) ON CONFLICT (key) DO NOTHING", (k, v))
+else:
+    db.execute("INSERT OR REPLACE INTO app_settings (key, value) VALUES (?,?)", ('timetable_published', '1'))
+    for k, v in [('lunch_start','13:00'), ('lunch_end','13:30'), ('efficiency_score','0')]:
+        db.execute("INSERT OR IGNORE INTO app_settings (key, value) VALUES (?,?)", (k, v))
 
 db.commit()
 db.close()
