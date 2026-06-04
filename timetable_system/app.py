@@ -8,7 +8,7 @@ from functools import wraps
 from flask import (Flask, render_template, request, redirect, session,
                    url_for, jsonify, flash, send_file, Response, abort)
 
-from models import init_db, seed_data, get_db
+from models import init_db, seed_data, seed_force, get_db
 from scheduler import (generate_timetable, get_timetable, is_published,
                        publish_timetable, unpublish_timetable, calculate_efficiency)
 from analytics import get_analytics_data, get_lecturer_workload, get_room_heatmap
@@ -1204,9 +1204,21 @@ def api_db_dump():
     return jsonify(result)
 
 
-# Initialize database on startup (required for Render/Gunicorn)
+@app.route('/api/seed-migration')
+def seed_migration():
+    password = request.args.get('password', '')
+    if password != 'migrate2026':
+        return jsonify({'error': 'unauthorized'}), 403
+    try:
+        seed_force()
+        return jsonify({'status': 'ok', 'message': 'Database reseeded with new timetable data'})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+# Initialize database and seed if fresh (required for Render/Gunicorn)
 init_db()
+seed_data()
 
 if __name__ == '__main__':
-    seed_data()
     app.run(debug=False, port=5000)

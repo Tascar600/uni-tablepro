@@ -474,88 +474,114 @@ def init_db():
 
 
 def seed_data():
-    conn = get_db()
-    existing = conn.execute("SELECT COUNT(*) FROM users").fetchone()[0]
+    db = get_db()
+    # Only seed if no courses exist (fresh database)
+    existing = db.execute("SELECT COUNT(*) FROM courses").fetchone()[0]
     if existing > 0:
-        conn.close()
+        db.close()
         return
 
-    conn.execute("INSERT INTO departments (name, code) VALUES (?,?)", ('Computer Science', 'CS'))
-    conn.execute("INSERT INTO departments (name, code) VALUES (?,?)", ('Mathematics', 'MATH'))
-    conn.execute("INSERT INTO departments (name, code) VALUES (?,?)", ('Engineering', 'ENG'))
+    # Departments
+    db.execute("INSERT INTO departments (name, code) VALUES (?,?)", ('Computer Science', 'CS'))
+    dept_id = db.execute("SELECT id FROM departments WHERE code='CS'").fetchone()[0]
 
-    conn.execute("INSERT INTO users (username, password, role, full_name, email, department_id) VALUES (?,?,?,?,?,?)",
-                   ('admin', 'admin123', 'admin', 'System Admin', 'admin@uni.edu', 1))
-    conn.execute("INSERT INTO users (username, password, role, full_name, email, department_id) VALUES (?,?,?,?,?,?)",
-                   ('lecturer1', 'pass123', 'lecturer', 'Dr. Alice Johnson', 'alice@uni.edu', 1))
-    conn.execute("INSERT INTO users (username, password, role, full_name, email, department_id) VALUES (?,?,?,?,?,?)",
-                   ('lecturer2', 'pass123', 'lecturer', 'Prof. Bob Smith', 'bob@uni.edu', 1))
-    conn.execute("INSERT INTO users (username, password, role, full_name, email, department_id) VALUES (?,?,?,?,?,?)",
-                   ('lecturer3', 'pass123', 'lecturer', 'Dr. Carol Lee', 'carol@uni.edu', 2))
-    conn.execute("INSERT INTO users (username, password, role, full_name, email, department_id) VALUES (?,?,?,?,?,?)",
-                   ('lecturer4', 'pass123', 'lecturer', 'Dr. David Kim', 'david@uni.edu', 2))
-    conn.execute("INSERT INTO users (username, password, role, full_name, email, department_id) VALUES (?,?,?,?,?,?)",
-                   ('student1', 'pass123', 'student', 'Student One', 'student1@uni.edu', 1))
-    conn.execute("INSERT INTO users (username, password, role, full_name, email, department_id) VALUES (?,?,?,?,?,?)",
-                   ('student2', 'pass123', 'student', 'Student Two', 'student2@uni.edu', 1))
-    conn.execute("INSERT INTO users (username, password, role, full_name, email, department_id) VALUES (?,?,?,?,?,?)",
-                   ('student3', 'pass123', 'student', 'Student Three', 'student3@uni.edu', 2))
-    conn.execute("INSERT INTO users (username, password, role, full_name, email, department_id) VALUES (?,?,?,?,?,?)",
-                   ('student4', 'pass123', 'student', 'Student Four', 'student4@uni.edu', 2))
+    # Rooms
+    for name, cap, rtype in [('FSE HALL', 200, 'lecture_hall'), ('PC108', 60, 'lab')]:
+        db.execute("INSERT INTO rooms (name, capacity, building, floor, room_type, has_projector, is_active) VALUES (?,?,?,?,?,1,1)",
+                   (name, cap, 'Main', 1, rtype))
 
-    conn.execute("INSERT INTO lecturer_preferences (user_id, preferred_days) VALUES (?,?)",
-                   (2, '["Monday","Wednesday","Friday"]'))
-    conn.execute("INSERT INTO lecturer_preferences (user_id, preferred_days) VALUES (?,?)",
-                   (3, '["Tuesday","Thursday"]'))
-    conn.execute("INSERT INTO lecturer_preferences (user_id, preferred_days) VALUES (?,?)",
-                   (4, '["Monday","Tuesday","Wednesday"]'))
-    conn.execute("INSERT INTO lecturer_preferences (user_id, preferred_days) VALUES (?,?)",
-                   (5, '["Wednesday","Thursday","Friday"]'))
+    room_map = {r['name']: r['id'] for r in db.execute("SELECT id, name FROM rooms").fetchall()}
 
-    conn.execute("INSERT INTO courses (name, code, level, lecturer_id, group_name, duration_hours, department_id, color) VALUES (?,?,?,?,?,?,?,?)",
-                   ('Introduction to Computer Science', 'CS101', 'university', 2, 'Group A', 1.5, 1, '#4A90D9'))
-    conn.execute("INSERT INTO courses (name, code, level, lecturer_id, group_name, duration_hours, department_id, color) VALUES (?,?,?,?,?,?,?,?)",
-                   ('Data Structures', 'CS201', 'university', 3, 'Group B', 1.5, 1, '#50C878'))
-    conn.execute("INSERT INTO courses (name, code, level, lecturer_id, group_name, duration_hours, department_id, color) VALUES (?,?,?,?,?,?,?,?)",
-                   ('Software Engineering', 'CS301', 'department', 2, 'Group A', 1.0, 1, '#E67E22'))
-    conn.execute("INSERT INTO courses (name, code, level, lecturer_id, group_name, duration_hours, department_id, color) VALUES (?,?,?,?,?,?,?,?)",
-                   ('Database Systems', 'CS302', 'department', 4, 'Group B', 1.0, 1, '#9B59B6'))
-    conn.execute("INSERT INTO courses (name, code, level, lecturer_id, group_name, duration_hours, department_id, color) VALUES (?,?,?,?,?,?,?,?)",
-                   ('Advanced Algorithms', 'CS401', 'single', 3, 'Group A', 1.0, 1, '#E74C3C'))
-    conn.execute("INSERT INTO courses (name, code, level, lecturer_id, group_name, duration_hours, department_id, color) VALUES (?,?,?,?,?,?,?,?)",
-                   ('Machine Learning', 'CS402', 'single', 4, 'Group B', 1.0, 1, '#1ABC9C'))
-    conn.execute("INSERT INTO courses (name, code, level, lecturer_id, group_name, duration_hours, department_id, color) VALUES (?,?,?,?,?,?,?,?)",
-                   ('Calculus I', 'MATH101', 'university', 5, 'Group C', 1.5, 2, '#F39C12'))
-    conn.execute("INSERT INTO courses (name, code, level, lecturer_id, group_name, duration_hours, department_id, color) VALUES (?,?,?,?,?,?,?,?)",
-                   ('Linear Algebra', 'MATH201', 'department', 5, 'Group C', 1.5, 2, '#2ECC71'))
+    # Admin
+    db.execute("INSERT INTO users (username, password, role, full_name, email, department_id) VALUES (?,?,?,?,?,?)",
+               ('admin', 'admin123', 'admin', 'System Admin', 'admin@uni.edu', dept_id))
 
-    conn.execute("INSERT INTO student_enrollments (student_id, course_id, group_name) VALUES (?,?,?)", (6, 1, 'Group A'))
-    conn.execute("INSERT INTO student_enrollments (student_id, course_id, group_name) VALUES (?,?,?)", (6, 2, 'Group B'))
-    conn.execute("INSERT INTO student_enrollments (student_id, course_id, group_name) VALUES (?,?,?)", (6, 4, 'Group B'))
-    conn.execute("INSERT INTO student_enrollments (student_id, course_id, group_name) VALUES (?,?,?)", (7, 1, 'Group A'))
-    conn.execute("INSERT INTO student_enrollments (student_id, course_id, group_name) VALUES (?,?,?)", (7, 2, 'Group B'))
-    conn.execute("INSERT INTO student_enrollments (student_id, course_id, group_name) VALUES (?,?,?)", (7, 6, 'Group B'))
-    conn.execute("INSERT INTO student_enrollments (student_id, course_id, group_name) VALUES (?,?,?)", (8, 7, 'Group C'))
-    conn.execute("INSERT INTO student_enrollments (student_id, course_id, group_name) VALUES (?,?,?)", (8, 8, 'Group C'))
-    conn.execute("INSERT INTO student_enrollments (student_id, course_id, group_name) VALUES (?,?,?)", (9, 7, 'Group C'))
-    conn.execute("INSERT INTO student_enrollments (student_id, course_id, group_name) VALUES (?,?,?)", (9, 8, 'Group C'))
+    # Lecturers
+    lec_names = [('mhlangamiso','Mhlanga Miso'),('chaitezvi','Chaitezvi'),('mhlanga','Mhlanga'),
+                 ('chituna','Chituna'),('zano','Zano'),('sakala','Sakala'),
+                 ('ndumiyana','Ndumiyana'),('chikwiriro','Chikwiriro')]
+    for uname, fname in lec_names:
+        db.execute("INSERT INTO users (username, password, role, full_name, email, department_id) VALUES (?,?,?,?,?,?)",
+                   (uname, 'password', 'lecturer', fname, f'{uname}@uni.edu', dept_id))
+    lec_map = {l['username']: l['id'] for l in db.execute("SELECT id, username FROM users WHERE role='lecturer'").fetchall()}
 
-    conn.execute("INSERT INTO rooms (name, capacity, building, floor, room_type, has_projector, has_computers) VALUES (?,?,?,?,?,?,?)",
-                   ('Hall A', 100, 'Main', 1, 'lecture_hall', 1, 0))
-    conn.execute("INSERT INTO rooms (name, capacity, building, floor, room_type, has_projector, has_computers) VALUES (?,?,?,?,?,?,?)",
-                   ('Hall B', 80, 'Main', 1, 'lecture_hall', 1, 0))
-    conn.execute("INSERT INTO rooms (name, capacity, building, floor, room_type, has_projector, has_computers) VALUES (?,?,?,?,?,?,?)",
-                   ('Room 101', 40, 'Science', 1, 'classroom', 1, 0))
-    conn.execute("INSERT INTO rooms (name, capacity, building, floor, room_type, has_projector, has_computers) VALUES (?,?,?,?,?,?,?)",
-                   ('Room 102', 35, 'Science', 1, 'classroom', 0, 0))
-    conn.execute("INSERT INTO rooms (name, capacity, building, floor, room_type, has_projector, has_computers) VALUES (?,?,?,?,?,?,?)",
-                   ('Lab 1', 25, 'Science', 2, 'lab', 1, 1))
-    conn.execute("INSERT INTO rooms (name, capacity, building, floor, room_type, has_projector, has_computers) VALUES (?,?,?,?,?,?,?)",
-                   ('Lab 2', 25, 'Science', 2, 'lab', 1, 1))
-    conn.execute("INSERT INTO rooms (name, capacity, building, floor, room_type, has_projector, has_computers) VALUES (?,?,?,?,?,?,?)",
-                   ('Seminar Room A', 30, 'Main', 2, 'seminar', 1, 0))
-    conn.execute("INSERT INTO rooms (name, capacity, building, floor, room_type, has_projector, has_computers) VALUES (?,?,?,?,?,?,?)",
-                   ('Lecture Theatre 1', 200, 'Main', 0, 'lecture_hall', 1, 0))
+    color_lec = {'Yellow':['mhlangamiso','chituna'],'Green':['mhlangamiso','chaitezvi'],'Orange':['zano'],
+                 'Purple':['sakala'],'Light Blue':['ndumiyana'],'Pink/Red':['chikwiriro'],
+                 'Red':['sakala'],'Brown':['mhlanga']}
+    def get_lec(c): return lec_map[color_lec.get(c,['sakala'])[0]]
 
-    conn.commit()
-    conn.close()
+    # Courses
+    courses_list = [
+        'CS216','CSH116','SWE115','CS214','NWE214','SWE212','SWE214','NWE216',
+        'SWE211','EEE2203','NWE411','C112','EEE1204','AMT114','SWE201','CS412',
+        'CS218','CS201','CSH115','NWE111','SWE114','NWE410','SWE416','SWE112','SWE205','SWE215'
+    ]
+    for code in courses_list:
+        db.execute("INSERT INTO courses (name, code, level, lecturer_id, group_name, duration_hours, color, department_id) VALUES (?,?,?,?,?,?,?,?)",
+                   (code, code, 'department', lec_map['sakala'], 'A', 2.0, '#4A90D9', dept_id))
+    c_map = {c['code']: c['id'] for c in db.execute("SELECT id, code FROM courses").fetchall()}
+
+    # Timetable entries
+    time_slots = [('0750','0950'),('1000','1200'),('1210','1410'),('1415','1615'),('1620','1820')]
+    entries = [
+        (0,'Monday','FSE HALL','F06','CS216/CSH116/SWE115','Yellow'),
+        (0,'Monday','FSE HALL','F10','CS214/NWE214/SWE212','Purple'),
+        (0,'Tuesday','PC108','F06','SWE214','Brown'),
+        (0,'Tuesday','PC108','F10','NWE216','Pink/Red'),
+        (0,'Wednesday','FSE HALL','F10','SWE211/EEE2203','Red'),
+        (0,'Thursday','FSE HALL','F06','NWE411','Light Blue'),
+        (0,'Thursday','FSE HALL','F10','C112/EEE1204/AMT114/SWE201','Light Blue'),
+        (0,'Friday','FSE HALL','F10','CS412','Green'),
+        (1,'Monday','FSE HALL','F06','CS216/CSH116/SWE115','Yellow'),
+        (1,'Monday','FSE HALL','F10','CS214/NWE214/SWE212','Purple'),
+        (1,'Tuesday','PC108','F06','SWE214','Brown'),
+        (1,'Tuesday','PC108','F10','NWE216','Pink/Red'),
+        (1,'Wednesday','FSE HALL','F10','SWE211/EEE2203','Red'),
+        (1,'Thursday','FSE HALL','F06','NWE411','Light Blue'),
+        (1,'Thursday','FSE HALL','F10','C112/EEE1204/AMT114/SWE201','Light Blue'),
+        (1,'Friday','FSE HALL','F10','CS412','Green'),
+        (2,'Monday','FSE HALL','F06','CS218','Purple'),
+        (2,'Monday','FSE HALL','F10','CS201/CSH115/NWE111/SWE114','Purple'),
+        (2,'Tuesday','PC108','F06','NWE410','Yellow'),
+        (2,'Thursday','FSE HALL','F06','SWE416','Light Blue'),
+        (2,'Thursday','FSE HALL','F10','SWE112','Green'),
+        (2,'Friday','FSE HALL','F06','SWE215','Green'),
+        (3,'Monday','FSE HALL','F06','CS218','Purple'),
+        (3,'Monday','FSE HALL','F10','CS201/CSH115/NWE111/SWE114','Purple'),
+        (3,'Tuesday','PC108','F06','NWE410','Yellow'),
+        (3,'Thursday','FSE HALL','F06','SWE416','Light Blue'),
+        (3,'Thursday','FSE HALL','F10','SWE205','Green'),
+        (3,'Friday','FSE HALL','F06','SWE215','Green'),
+    ]
+    for si, day, venue, group, codes_str, color in entries:
+        st, et = time_slots[si]
+        lec = get_lec(color)
+        for code in codes_str.split('/'):
+            cid = c_map.get(code.strip())
+            if cid:
+                db.execute("INSERT INTO timetable_entries (course_id,lecturer_id,room_id,day,start_time,end_time,group_name,published) VALUES (?,?,?,?,?,?,?,?)",
+                           (cid, lec, room_map[venue], day, f'{st[:2]}:{st[2:]}', f'{et[:2]}:{et[2:]}', group, 1))
+
+    # App settings
+    if db.pg:
+        db.execute("INSERT INTO app_settings (key, value) VALUES (%s, %s) ON CONFLICT (key) DO UPDATE SET value = %s",
+                   ('timetable_published', '1', '1'))
+    else:
+        db.execute("INSERT OR REPLACE INTO app_settings (key, value) VALUES (?,?)", ('timetable_published', '1'))
+
+    db.commit()
+    db.close()
+
+def seed_force():
+    """Force reseed - clears all data and re-inserts."""
+    db = get_db()
+    for t in ['attendance_records','substitute_allocations','conflict_resolutions','timetable_versions',
+              'student_enrollments','timetable_entries','courses','lecturer_preferences',
+              'lecturer_availability','activity_logs','notifications','timetable_shares','users','rooms','departments']:
+        try: db.execute(f"DELETE FROM {t}")
+        except Exception: pass
+    try: db.execute("DELETE FROM app_settings")
+    except Exception: pass
+    db.commit()
+    db.close()
+    seed_data()
