@@ -31,12 +31,14 @@ db.execute("DELETE FROM app_settings")
 db.commit()
 
 # ── Departments ──
-db.execute("INSERT INTO departments (name, code) VALUES (?,?)", ('Computer Science', 'CS'))
+dept_names = ['Biological Sciences', 'Engineering and Physics', 'Statistics and Mathematics',
+              'Chemistry', 'Computer Science', 'Sports Sciences', 'Geosciences',
+              'Geography', 'Health Sciences', 'Disaster Risk Reduction', 'Optometry']
+for name in dept_names:
+    code = name.upper().replace(' ', '')
+    db.execute("INSERT OR IGNORE INTO departments (name, code) VALUES (?,?)", (f'Department of {name}', code))
 db.commit()
-cs_dept_id = db.execute("SELECT id FROM departments WHERE code='CS'").fetchone()[0]
-db.execute("INSERT INTO departments (name, code) VALUES (?,?)", ('Mathematics', 'MATH'))
-db.execute("INSERT INTO departments (name, code) VALUES (?,?)", ('Engineering', 'ENG'))
-db.commit()
+cs_dept_id = db.execute("SELECT id FROM departments WHERE code='COMPUTERSCIENCE'").fetchone()[0]
 
 # ── Rooms (venues) ──
 rooms_list = [

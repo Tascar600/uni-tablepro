@@ -482,8 +482,12 @@ def seed_data():
         return
 
     # Departments
-    db.execute("INSERT INTO departments (name, code) VALUES (?,?)", ('Computer Science', 'CS'))
-    dept_id = db.execute("SELECT id FROM departments WHERE code='CS'").fetchone()[0]
+    for name in ['Biological Sciences', 'Engineering and Physics', 'Statistics and Mathematics',
+                 'Chemistry', 'Computer Science', 'Sports Sciences', 'Geosciences',
+                 'Geography', 'Health Sciences', 'Disaster Risk Reduction', 'Optometry']:
+        code = name.upper().replace(' ', '')
+        db.execute("INSERT OR IGNORE INTO departments (name, code) VALUES (?,?)", (f'Department of {name}', code))
+    dept_id = db.execute("SELECT id FROM departments WHERE code='COMPUTERSCIENCE'").fetchone()[0]
 
     # Rooms
     for name, cap, rtype in [('FSE HALL', 200, 'lecture_hall'), ('PC108', 60, 'lab')]:
