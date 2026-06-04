@@ -174,8 +174,12 @@ def dashboard():
         return render_template('admin_dashboard.html', **data)
 
     elif role == 'lecturer':
-        courses = db.execute("SELECT * FROM courses WHERE lecturer_id=?",
-                             (session['user_id'],)).fetchall()
+        courses = db.execute("""
+            SELECT c.*, d.name as department_name
+            FROM courses c
+            LEFT JOIN departments d ON c.department_id = d.id
+            WHERE c.lecturer_id=?
+        """, (session['user_id'],)).fetchall()
         entries = db.execute("""
             SELECT te.*, c.name as course_name, c.code, r.name as room_name
             FROM timetable_entries te
@@ -189,6 +193,8 @@ def dashboard():
         data['published'] = is_published()
         workload = get_lecturer_workload(session['user_id'])
         data['workload'] = workload
+        depts = db.execute("SELECT * FROM departments").fetchall()
+        data['departments'] = [dict(d) for d in depts]
         db.close()
         return render_template('lecturer_dashboard.html', **data)
 
@@ -634,9 +640,11 @@ def add_course():
     level = request.form['level']
     group_name = request.form['group_name']
     duration = float(request.form.get('duration', 1.0))
+    department_id = request.form.get('department_id') or None
+    color = request.form.get('color', '#4A90D9')
     db = get_db()
-    db.execute("INSERT INTO courses (name, code, level, lecturer_id, group_name, duration_hours) VALUES (?,?,?,?,?,?)",
-               (name, code, level, session['user_id'], group_name, duration))
+    db.execute("INSERT INTO courses (name, code, level, lecturer_id, group_name, duration_hours, department_id, color) VALUES (?,?,?,?,?,?,?,?)",
+               (name, code, level, session['user_id'], group_name, duration, department_id, color))
     db.commit()
     log_activity(session['user_id'], 'add_course', f'Added course: {name} ({code})', 'course')
     db.close()
