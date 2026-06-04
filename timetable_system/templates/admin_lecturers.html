@@ -45,6 +45,7 @@
             </div>
             <div class="flex-center gap-1">
                 <span class="badge badge-lecturer">Lecturer</span>
+                <button class="btn btn-sm btn-primary" onclick="openEditLecturer({{ ld.lecturer.id }})">Edit</button>
                 <form method="POST" action="/admin/delete-lecturer/{{ ld.lecturer.id }}" style="display:inline" onsubmit="return confirm('Delete lecturer {{ ld.lecturer.full_name }}? This will also delete all their courses and timetable entries.')">
                     <button type="submit" class="btn btn-sm btn-danger">Delete</button>
                 </form>
@@ -103,4 +104,35 @@
     </div>
     {% endfor %}
 </div>
+
+<div class="modal" id="editLecturerModal">
+    <div class="modal-backdrop" onclick="closeModal('editLecturerModal')"></div>
+    <div class="modal-content">
+        <h3>Edit Lecturer</h3>
+        <form method="POST" id="editLecturerForm">
+            <div class="form-group">
+                <label>Full Name</label>
+                <input type="text" name="full_name" id="edit-lecturer-name" required>
+            </div>
+            <div class="form-group">
+                <label>Email</label>
+                <input type="email" name="email" id="edit-lecturer-email">
+            </div>
+            <button type="submit" class="btn btn-primary">Save Changes</button>
+            <button type="button" class="btn btn-ghost" onclick="closeModal('editLecturerModal')">Cancel</button>
+        </form>
+    </div>
+</div>
+
+<script>
+var lecturersData = {{ lecturers|tojson }};
+function openEditLecturer(id) {
+    var ld = lecturersData.find(function(x) { return x.lecturer.id === id; });
+    if (!ld) return;
+    document.getElementById('edit-lecturer-name').value = ld.lecturer.full_name;
+    document.getElementById('edit-lecturer-email').value = ld.lecturer.email || '';
+    document.getElementById('editLecturerForm').action = '/admin/edit-lecturer/' + id;
+    openModal('editLecturerModal');
+}
+</script>
 {% endblock %}

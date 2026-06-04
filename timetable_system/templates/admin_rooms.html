@@ -98,6 +98,7 @@
                     <td>{{ '&#10003;'|safe if r.has_projector else '&#10007;'|safe }}</td>
                     <td>{{ '&#10003;'|safe if r.has_computers else '&#10007;'|safe }}</td>
                     <td>
+                        <button class="btn btn-sm btn-primary" onclick="openEditRoom({{ r.id }})">Edit</button>
                         <form method="POST" action="/admin/rooms/delete/{{ r.id }}" style="display:inline">
                             <button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('Delete {{ r.name }}?')">Delete</button>
                         </form>
@@ -114,4 +115,75 @@
     </div>
     {% endif %}
 </div>
+
+<div class="modal" id="editRoomModal">
+    <div class="modal-backdrop" onclick="closeModal('editRoomModal')"></div>
+    <div class="modal-content">
+        <h3>Edit Room</h3>
+        <form method="POST" id="editRoomForm">
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Room Name</label>
+                    <input type="text" name="name" id="edit-room-name" required>
+                </div>
+                <div class="form-group">
+                    <label>Capacity</label>
+                    <input type="number" name="capacity" id="edit-room-capacity" min="1">
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Building</label>
+                    <input type="text" name="building" id="edit-room-building">
+                </div>
+                <div class="form-group">
+                    <label>Floor</label>
+                    <input type="number" name="floor" id="edit-room-floor" min="0">
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Room Type</label>
+                    <select name="room_type" id="edit-room-type">
+                        <option value="classroom">Classroom</option>
+                        <option value="lab">Laboratory</option>
+                        <option value="lecture_hall">Lecture Hall</option>
+                        <option value="seminar">Seminar Room</option>
+                    </select>
+                </div>
+                <div class="form-group" style="display:flex;align-items:center;gap:1rem;padding-top:1.5rem">
+                    <label class="switch">
+                        <input type="checkbox" name="has_projector" id="edit-room-projector">
+                        <span class="slider"></span>
+                    </label>
+                    <span style="font-size:0.85rem">Projector</span>
+                    <label class="switch">
+                        <input type="checkbox" name="has_computers" id="edit-room-computers">
+                        <span class="slider"></span>
+                    </label>
+                    <span style="font-size:0.85rem">Computers</span>
+                </div>
+            </div>
+            <button type="submit" class="btn btn-primary">Save Changes</button>
+            <button type="button" class="btn btn-ghost" onclick="closeModal('editRoomModal')">Cancel</button>
+        </form>
+    </div>
+</div>
+
+<script>
+var roomsData = {{ rooms|tojson }};
+function openEditRoom(id) {
+    var r = roomsData.find(function(x) { return x.id === id; });
+    if (!r) return;
+    document.getElementById('edit-room-name').value = r.name;
+    document.getElementById('edit-room-capacity').value = r.capacity;
+    document.getElementById('edit-room-building').value = r.building;
+    document.getElementById('edit-room-floor').value = r.floor;
+    document.getElementById('edit-room-type').value = r.room_type;
+    document.getElementById('edit-room-projector').checked = r.has_projector == 1;
+    document.getElementById('edit-room-computers').checked = r.has_computers == 1;
+    document.getElementById('editRoomForm').action = '/admin/edit-room/' + id;
+    openModal('editRoomModal');
+}
+</script>
 {% endblock %}

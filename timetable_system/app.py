@@ -284,6 +284,25 @@ def admin_delete_lecturer(lecturer_id):
     return redirect(url_for('admin_lecturers'))
 
 
+@app.route('/admin/edit-lecturer/<int:lecturer_id>', methods=['POST'])
+@login_required
+@role_required('admin')
+def admin_edit_lecturer(lecturer_id):
+    full_name = request.form['full_name'].strip()
+    email = request.form.get('email', '').strip()
+    db = get_db()
+    try:
+        db.execute("UPDATE users SET full_name=?, email=? WHERE id=? AND role='lecturer'",
+                   (full_name, email, lecturer_id))
+        db.commit()
+        log_activity(session['user_id'], 'edit_lecturer', f'Edited lecturer: {full_name}')
+        flash('Lecturer updated successfully!', 'success')
+    except Exception as e:
+        flash(f'Error: {str(e)}', 'error')
+    db.close()
+    return redirect(url_for('admin_lecturers'))
+
+
 @app.route('/admin/rooms')
 @login_required
 @role_required('admin')
@@ -327,6 +346,30 @@ def admin_delete_room(room_id):
     db.commit()
     log_activity(session['user_id'], 'delete_room', f'Deleted room #{room_id}', 'room', room_id)
     flash('Room deleted.', 'success')
+    db.close()
+    return redirect(url_for('admin_rooms'))
+
+
+@app.route('/admin/edit-room/<int:room_id>', methods=['POST'])
+@login_required
+@role_required('admin')
+def admin_edit_room(room_id):
+    name = request.form['name']
+    capacity = int(request.form.get('capacity', 30))
+    building = request.form.get('building', 'Main')
+    floor = int(request.form.get('floor', 1))
+    room_type = request.form.get('room_type', 'classroom')
+    has_projector = 1 if request.form.get('has_projector') else 0
+    has_computers = 1 if request.form.get('has_computers') else 0
+    db = get_db()
+    try:
+        db.execute("UPDATE rooms SET name=?, capacity=?, building=?, floor=?, room_type=?, has_projector=?, has_computers=? WHERE id=?",
+                   (name, capacity, building, floor, room_type, has_projector, has_computers, room_id))
+        db.commit()
+        log_activity(session['user_id'], 'edit_room', f'Edited room: {name}')
+        flash('Room updated successfully!', 'success')
+    except Exception as e:
+        flash(f'Error: {str(e)}', 'error')
     db.close()
     return redirect(url_for('admin_rooms'))
 
@@ -392,6 +435,32 @@ def admin_delete_course(course_id):
         log_activity(session['user_id'], 'delete_course', f'Deleted course: {course["name"]}', 'course', course_id)
     db.close()
     flash('Course deleted.', 'success')
+    return redirect(url_for('admin_courses'))
+
+
+@app.route('/admin/edit-course/<int:course_id>', methods=['POST'])
+@login_required
+@role_required('admin')
+def admin_edit_course(course_id):
+    name = request.form['name']
+    code = request.form['code']
+    level = request.form['level']
+    lecturer_id = request.form['lecturer_id']
+    group_name = request.form['group_name']
+    duration = float(request.form.get('duration', 1.0))
+    department_id = request.form.get('department_id') or None
+    color = request.form.get('color', '#4A90D9')
+    max_students = int(request.form.get('max_students', 0))
+    db = get_db()
+    try:
+        db.execute("UPDATE courses SET name=?, code=?, level=?, lecturer_id=?, group_name=?, duration_hours=?, department_id=?, color=?, max_students=? WHERE id=?",
+                   (name, code, level, lecturer_id, group_name, duration, department_id, color, max_students, course_id))
+        db.commit()
+        log_activity(session['user_id'], 'edit_course', f'Edited course: {name} ({code})')
+        flash('Course updated successfully!', 'success')
+    except Exception as e:
+        flash(f'Error: {str(e)}', 'error')
+    db.close()
     return redirect(url_for('admin_courses'))
 
 
