@@ -494,7 +494,7 @@ def seed_data():
 
     # Admin
     db.execute("INSERT INTO users (username, password, role, full_name, email, department_id) VALUES (?,?,?,?,?,?)",
-               ('admin', 'admin123', 'admin', 'System Admin', 'admin@uni.edu', dept_id))
+               ('admin', 'admin2026', 'admin', 'System Admin', 'admin@uni.edu', dept_id))
 
     # Lecturers
     lec_names = [('mhlangamiso','Mhlanga Miso'),('chaitezvi','Chaitezvi'),('mhlanga','Mhlanga'),

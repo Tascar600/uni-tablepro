@@ -54,7 +54,7 @@ for r in db.execute("SELECT id, name FROM rooms").fetchall():
 
 # ── Admin user ──
 db.execute("INSERT INTO users (username, password, role, full_name, email, department_id) VALUES (?,?,?,?,?,?)",
-           ('admin', 'admin123', 'admin', 'System Admin', 'admin@uni.edu', cs_dept_id))
+           ('admin', 'admin2026', 'admin', 'System Admin', 'admin@uni.edu', cs_dept_id))
 db.commit()
 
 # ── Lecturers (from color key) ──

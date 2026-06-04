@@ -82,7 +82,7 @@ def login():
         password = request.form.get('password', '').strip()
 
         if role == 'admin':
-            if password == 'admin123':
+            if password == 'admin2026':
                 db = get_db()
                 user = db.execute("SELECT * FROM users WHERE role='admin' AND is_active=1").fetchone()
                 db.close()
