@@ -65,6 +65,12 @@ def ensure_db():
         init_db()
         seed_data()
         app._db_initialized = True
+    if 'user_id' in session:
+        db = get_db()
+        exists = db.execute("SELECT id FROM users WHERE id=?", (session['user_id'],)).fetchone()
+        db.close()
+        if not exists:
+            session.clear()
 
 
 @app.route('/')
@@ -140,8 +146,6 @@ def register():
 
 @app.route('/logout')
 def logout():
-    if 'user_id' in session:
-        log_activity(session['user_id'], 'logout', 'User logged out')
     session.clear()
     return redirect(url_for('login'))
 
