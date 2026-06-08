@@ -162,7 +162,7 @@ def get_room_heatmap():
     db.close()
 
     days_order = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday']
-    time_slots = ['07:00-09:00', '09:00-11:00', '11:00-13:00', '14:00-16:00', '16:00-18:00']
+    time_slots = ['08:00-10:00', '10:00-12:00', '12:00-14:00', '14:00-16:00', '16:00-17:00']
 
     rooms_data = defaultdict(lambda: {day: {slot: 0 for slot in time_slots} for day in days_order})
 

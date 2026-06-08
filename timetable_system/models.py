@@ -487,25 +487,33 @@ def seed_data():
         db.execute("INSERT OR IGNORE INTO departments (name, code) VALUES (?,?)", (f'Department of {name}', code))
     dept_cs = db.execute("SELECT id FROM departments WHERE code='COMPUTERSCIENCE'").fetchone()[0]
 
-    rooms_data = [('F10', 150, 'lab'), ('F06', 50, 'classroom'), ('FSE HALL', 500, 'lecture_hall')]
-    for name, cap, rtype in rooms_data:
-        db.execute("INSERT OR IGNORE INTO rooms (name, capacity, building, floor, room_type, has_projector, is_active) VALUES (?,?,?,?,?,1,1)",
-                   (name, cap, 'Main', 1, rtype))
+    rooms_data = [
+        ('F10', 150, 2, 'lab', 1, 1),
+        ('F06', 50, 2, 'classroom', 1, 0),
+        ('FSE HALL', 500, 1, 'lecture_hall', 0, 0),
+    ]
+    for name, cap, floor, rtype, proj, comp in rooms_data:
+        db.execute("INSERT OR IGNORE INTO rooms (name, capacity, building, floor, room_type, has_projector, has_computers, is_active) VALUES (?,?,?,?,?,?,?,1)",
+                   (name, cap, 'Main', floor, rtype, proj, comp))
     room_map = {r['name']: r['id'] for r in db.execute("SELECT id, name FROM rooms").fetchall()}
 
     db.execute("INSERT OR IGNORE INTO users (username, password, role, full_name, email, department_id) VALUES (?,?,?,?,?,?)",
                ('admin', 'admin2026', 'admin', 'System Admin', 'admin@uni.edu', dept_cs))
 
     lecturers = [
-        ('mhlanganiso','Mr Mhlanganiso','mhlanganiso'), ('mhlanga','Mr Mhlanga','mhlana'),
-        ('zano','Mr Zano','zano'), ('sakala','Dr Sakala','salaka'),
-        ('chituma','Mr Chituma','chituma'), ('ndumiyana','Mr Ndumiyana','ndumiyana'),
-        ('chikwiriro','Mr Chikwiriro','chikwiriro'), ('chaitezvi','Mr Chaitezvi','chaitezvi'),
-        ('katsinde','Dr Katsinde','katsinde'),
+        ('mhlanganiso','Mr Mhlanganiso','mhlanganiso','hmhlanganiso@buse.ac.zw'),
+        ('mhlanga','Mr Mhlanga','mhlana','mhlanga@buse.ac.zw'),
+        ('zano','Mr Zano','zano','zano@buse.ac.zw'),
+        ('sakala','Dr Sakala','salaka','sakala@buse.ac.zw'),
+        ('chituma','Mr Chituma','chituma','chituma@buse.ac.zw'),
+        ('ndumiyana','Mr Ndumiyana','ndumiyana','ndumiyana@buse.ac.zw'),
+        ('chikwiriro','Mr Chikwiriro','chikwiriro','chikwiriro@buse.ac.zw'),
+        ('chaitezvi','Mr Chaitezvi','chaitezvi','chaitezvi@buse.ac.zw'),
+        ('katsinde','Dr Katsinde','katsinde','katsinde@buse.ac.zw'),
     ]
-    for uname, fname, pw in lecturers:
+    for uname, fname, pw, email in lecturers:
         db.execute("INSERT OR IGNORE INTO users (username, password, role, full_name, email, department_id) VALUES (?,?,?,?,?,?)",
-                   (uname, pw, 'lecturer', fname, f'{uname}@buse.ac.zw', dept_cs))
+                   (uname, pw, 'lecturer', fname, email, None))
     lec_map = {l['username']: l['id'] for l in db.execute("SELECT id, username FROM users WHERE role='lecturer'").fetchall()}
 
     courses_data = [

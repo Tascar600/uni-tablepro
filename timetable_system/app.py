@@ -1235,7 +1235,8 @@ def seed_migration():
         return jsonify({'error': 'unauthorized'}), 403
     try:
         seed_force()
-        return jsonify({'status': 'ok', 'message': 'Database reseeded with new timetable data'})
+        seed_data()
+        return jsonify({'status': 'ok', 'message': 'Database reseeded with your local data'})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
