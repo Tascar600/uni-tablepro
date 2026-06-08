@@ -209,14 +209,17 @@ def generate_timetable():
 
                 actual_end = minutes_to_time(actual_end_min)
 
-                if start_mins < break_end and actual_end_min > break_start:
-                    continue
-                if start_mins >= break_start and start_mins < break_end:
-                    continue
-                if actual_end_min > break_start and actual_end_min <= break_end:
-                    continue
+                # For courses > 2h, skip full-span break/lunch checks (will be split into blocks)
+                split_course = course_duration_min > 120
+                if not split_course:
+                    if start_mins < break_end and actual_end_min > break_start:
+                        continue
+                    if start_mins >= break_start and start_mins < break_end:
+                        continue
+                    if actual_end_min > break_start and actual_end_min <= break_end:
+                        continue
 
-                if lunch_opt:
+                if lunch_opt and not split_course:
                     if start_mins < lunch_end and actual_end_min > lunch_start:
                         continue
                     if start_mins >= lunch_start and start_mins < lunch_end:
@@ -266,21 +269,33 @@ def generate_timetable():
                             'room_name': room['name'],
                         }
 
-                        db.execute("""
-                            INSERT INTO timetable_entries (course_id, lecturer_id, room_id, day, start_time, end_time, group_name, published)
-                            VALUES (?,?,?,?,?,?,?,0)
-                        """, (entry_data['course_id'], entry_data['lecturer_id'], entry_data['room_id'],
-                              entry_data['day'], entry_data['start_time'], entry_data['end_time'], entry_data['group_name']))
+                        # Split long courses into 2-hour blocks for multi-slot display
+                        block_min = 120
+                        rem_min = course_duration_min
+                        bstart = start_mins
+                        first_block = True
+                        while rem_min > 0:
+                            bdur = min(block_min, rem_min)
+                            bend = bstart + bdur
+                            bst_str = minutes_to_time(bstart).strftime('%H:%M')
+                            bet_str = minutes_to_time(bend).strftime('%H:%M')
 
-                        assigned.append({
-                            'id': len(assigned) + 1,
-                            'lecturer_id': lec_id, 'room_id': room_id, 'day': day,
-                            'start_time': start_time.strftime('%H:%M'),
-                            'end_time': actual_end.strftime('%H:%M'),
-                            'start_m': start_mins, 'end_m': actual_end_min,
-                            'group_name': course['group_name'],
-                            'course_name': course['name'],
-                        })
+                            db.execute("""
+                                INSERT INTO timetable_entries (course_id, lecturer_id, room_id, day, start_time, end_time, group_name, published)
+                                VALUES (?,?,?,?,?,?,?,0)
+                            """, (course['id'], lec_id, room_id, day, bst_str, bet_str, course['group_name']))
+
+                            assigned.append({
+                                'id': len(assigned) + 1,
+                                'lecturer_id': lec_id, 'room_id': room_id, 'day': day,
+                                'start_time': bst_str, 'end_time': bet_str,
+                                'start_m': bstart, 'end_m': bend,
+                                'group_name': course['group_name'],
+                                'course_name': course['name'],
+                            })
+                            bstart = bend
+                            rem_min -= bdur
+
                         lecturer_hours[lec_id] = lecturer_hours.get(lec_id, 0) + course_duration
                         entries.append(entry_data)
                         assigned_flag = True
@@ -314,14 +329,16 @@ def generate_timetable():
 
                     actual_end = minutes_to_time(actual_end_min)
 
-                    if start_mins < break_end and actual_end_min > break_start:
-                        continue
-                    if start_mins >= break_start and start_mins < break_end:
-                        continue
-                    if actual_end_min > break_start and actual_end_min <= break_end:
-                        continue
+                    split_course = course_duration_min > 120
+                    if not split_course:
+                        if start_mins < break_end and actual_end_min > break_start:
+                            continue
+                        if start_mins >= break_start and start_mins < break_end:
+                            continue
+                        if actual_end_min > break_start and actual_end_min <= break_end:
+                            continue
 
-                    if lunch_opt:
+                    if lunch_opt and not split_course:
                         if start_mins < lunch_end and actual_end_min > lunch_start:
                             continue
                         if start_mins >= lunch_start and start_mins < lunch_end:
@@ -344,20 +361,28 @@ def generate_timetable():
                                 'level': course['level'], 'lecturer_name': course['lecturer_name'],
                                 'room_name': room['name'],
                             }
-                            db.execute("""
-                                INSERT INTO timetable_entries (course_id, lecturer_id, room_id, day, start_time, end_time, group_name, published)
-                                VALUES (?,?,?,?,?,?,?,0)
-                            """, (entry_data['course_id'], entry_data['lecturer_id'], entry_data['room_id'],
-                                  entry_data['day'], entry_data['start_time'], entry_data['end_time'], entry_data['group_name']))
-                            assigned.append({
-                                'id': len(assigned) + 1,
-                                'lecturer_id': lec_id, 'room_id': room_id, 'day': day,
-                                'start_time': start_time.strftime('%H:%M'),
-                                'end_time': actual_end.strftime('%H:%M'),
-                                'start_m': start_mins, 'end_m': actual_end_min,
-                                'group_name': course['group_name'],
-                                'course_name': course['name'],
-                            })
+                            block_min = 120
+                            rem_min = course_duration_min
+                            bstart = start_mins
+                            while rem_min > 0:
+                                bdur = min(block_min, rem_min)
+                                bend = bstart + bdur
+                                bst_str = minutes_to_time(bstart).strftime('%H:%M')
+                                bet_str = minutes_to_time(bend).strftime('%H:%M')
+                                db.execute("""
+                                    INSERT INTO timetable_entries (course_id, lecturer_id, room_id, day, start_time, end_time, group_name, published)
+                                    VALUES (?,?,?,?,?,?,?,0)
+                                """, (course['id'], lec_id, room_id, day, bst_str, bet_str, course['group_name']))
+                                assigned.append({
+                                    'id': len(assigned) + 1,
+                                    'lecturer_id': lec_id, 'room_id': room_id, 'day': day,
+                                    'start_time': bst_str, 'end_time': bet_str,
+                                    'start_m': bstart, 'end_m': bend,
+                                    'group_name': course['group_name'],
+                                    'course_name': course['name'],
+                                })
+                                bstart = bend
+                                rem_min -= bdur
                             entries.append(entry_data)
                             assigned_flag = True
                             reason = None
