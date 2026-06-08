@@ -179,7 +179,7 @@
             <div class="timetable-header">{{ day[:3] }}</div>
             {% endfor %}
 
-            {% set slots = ['07:00-09:00','09:00-11:00','11:00-13:00','13:00-15:00','15:00-18:00'] %}
+            {% set slots = ['08:00-10:00','10:00-12:00','12:00-14:00','14:00-16:00','16:00-17:00'] %}
             {% for slot in slots %}
             {% set s = slot.split('-') %}
             <div class="timetable-time">{{ s[0] }}<br><small>{{ s[1] }}</small></div>
