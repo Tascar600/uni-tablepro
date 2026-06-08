@@ -59,7 +59,7 @@ def get_db():
         conn = psycopg2.connect(_DATABASE_URL)
         conn.autocommit = True
         return _DB(conn, pg=True)
-    conn = sqlite3.connect(DB_PATH, timeout=10)
+    conn = sqlite3.connect(DB_PATH, timeout=60)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA foreign_keys = ON")
     conn.execute("PRAGMA journal_mode=WAL")
@@ -491,13 +491,13 @@ def seed_data():
 
     # Rooms
     for name, cap, rtype in [('FSE HALL', 200, 'lecture_hall'), ('PC108', 60, 'lab')]:
-        db.execute("INSERT INTO rooms (name, capacity, building, floor, room_type, has_projector, is_active) VALUES (?,?,?,?,?,1,1)",
+        db.execute("INSERT OR IGNORE INTO rooms (name, capacity, building, floor, room_type, has_projector, is_active) VALUES (?,?,?,?,?,1,1)",
                    (name, cap, 'Main', 1, rtype))
 
     room_map = {r['name']: r['id'] for r in db.execute("SELECT id, name FROM rooms").fetchall()}
 
     # Admin
-    db.execute("INSERT INTO users (username, password, role, full_name, email, department_id) VALUES (?,?,?,?,?,?)",
+    db.execute("INSERT OR IGNORE INTO users (username, password, role, full_name, email, department_id) VALUES (?,?,?,?,?,?)",
                ('admin', 'admin2026', 'admin', 'System Admin', 'admin@uni.edu', dept_id))
 
     # Lecturers

@@ -278,12 +278,25 @@ function generateTimetable() {
                 return;
             }
             if (status) {
+                let msg = `Timetable generated with ${data.count} entries!`;
+                if (data.unassigned && data.unassigned.length > 0) {
+                    msg += `<br><br><strong>Courses NOT placed (${data.unassigned.length}):</strong><ul style="margin:4px 0 0 16px;text-align:left">`;
+                    data.unassigned.forEach(c => {
+                        msg += `<li>${c.code || c.course_name}: ${c.reason}</li>`;
+                    });
+                    msg += '</ul>';
+                }
                 status.className = 'alert alert-success';
-                status.textContent = `Timetable generated with ${data.count} entries!`;
+                status.innerHTML = msg;
                 status.style.display = 'block';
             }
             showToast(`Generated ${data.count} entries!`, 'success');
-            setTimeout(() => { window.location.href = '/dashboard'; }, 1000);
+            if (!data.unassigned || data.unassigned.length === 0) {
+                setTimeout(() => { window.location.href = '/dashboard'; }, 1000);
+            } else {
+                btn.disabled = false;
+                btn.textContent = 'Generate Timetable';
+            }
         })
         .catch(() => {
             if (status) {

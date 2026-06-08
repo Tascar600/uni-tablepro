@@ -281,11 +281,23 @@ def admin_delete_lecturer(lecturer_id):
     db = get_db()
     lecturer = db.execute("SELECT * FROM users WHERE id=? AND role='lecturer'", (lecturer_id,)).fetchone()
     if lecturer:
-        db.execute("DELETE FROM student_enrollments WHERE course_id IN (SELECT id FROM courses WHERE lecturer_id=?)", (lecturer_id,))
-        db.execute("DELETE FROM timetable_entries WHERE lecturer_id=?", (lecturer_id,))
-        db.execute("DELETE FROM courses WHERE lecturer_id=?", (lecturer_id,))
-        db.execute("DELETE FROM lecturer_preferences WHERE user_id=?", (lecturer_id,))
-        db.execute("DELETE FROM lecturer_availability WHERE lecturer_id=?", (lecturer_id,))
+        for table, col in [('student_enrollments', 'student_id'),
+                           ('attendance_records', 'student_id'),
+                           ('timetable_entries', 'lecturer_id'),
+                           ('courses', 'lecturer_id'),
+                           ('substitute_allocations', 'original_lecturer_id'),
+                           ('substitute_allocations', 'substitute_lecturer_id'),
+                           ('lecturer_preferences', 'user_id'),
+                           ('lecturer_availability', 'lecturer_id'),
+                           ('activity_logs', 'user_id'),
+                           ('notifications', 'user_id'),
+                           ('timetable_versions', 'created_by'),
+                           ('draft_timetables', 'user_id'),
+                           ('conflict_resolutions', 'resolved_by')]:
+            try:
+                db.execute(f"DELETE FROM {table} WHERE {col}=?", (lecturer_id,))
+            except Exception:
+                pass
         db.execute("DELETE FROM users WHERE id=?", (lecturer_id,))
         db.commit()
         log_activity(session['user_id'], 'delete_lecturer', f'Deleted lecturer: {lecturer["full_name"]}')
