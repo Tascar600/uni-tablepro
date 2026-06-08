@@ -475,103 +475,65 @@ def init_db():
 
 def seed_data():
     db = get_db()
-    # Only seed if no courses exist (fresh database)
     existing = db.execute("SELECT COUNT(*) FROM courses").fetchone()[0]
     if existing > 0:
         db.close()
         return
 
-    # Departments
     for name in ['Biological Sciences', 'Engineering and Physics', 'Statistics and Mathematics',
                  'Chemistry', 'Computer Science', 'Sports Sciences', 'Geosciences',
                  'Geography', 'Health Sciences', 'Disaster Risk Reduction', 'Optometry']:
         code = name.upper().replace(' ', '')
         db.execute("INSERT OR IGNORE INTO departments (name, code) VALUES (?,?)", (f'Department of {name}', code))
-    dept_id = db.execute("SELECT id FROM departments WHERE code='COMPUTERSCIENCE'").fetchone()[0]
+    dept_cs = db.execute("SELECT id FROM departments WHERE code='COMPUTERSCIENCE'").fetchone()[0]
 
-    # Rooms
-    for name, cap, rtype in [('FSE HALL', 200, 'lecture_hall'), ('PC108', 60, 'lab')]:
+    rooms_data = [('F10', 150, 'lab'), ('F06', 50, 'classroom'), ('FSE HALL', 500, 'lecture_hall')]
+    for name, cap, rtype in rooms_data:
         db.execute("INSERT OR IGNORE INTO rooms (name, capacity, building, floor, room_type, has_projector, is_active) VALUES (?,?,?,?,?,1,1)",
                    (name, cap, 'Main', 1, rtype))
-
     room_map = {r['name']: r['id'] for r in db.execute("SELECT id, name FROM rooms").fetchall()}
 
-    # Admin
     db.execute("INSERT OR IGNORE INTO users (username, password, role, full_name, email, department_id) VALUES (?,?,?,?,?,?)",
-               ('admin', 'admin2026', 'admin', 'System Admin', 'admin@uni.edu', dept_id))
+               ('admin', 'admin2026', 'admin', 'System Admin', 'admin@uni.edu', dept_cs))
 
-    # Lecturers
-    lec_names = [('mhlangamiso','Mhlanga Miso'),('chaitezvi','Chaitezvi'),('mhlanga','Mhlanga'),
-                 ('chituna','Chituna'),('zano','Zano'),('sakala','Sakala'),
-                 ('ndumiyana','Ndumiyana'),('chikwiriro','Chikwiriro')]
-    for uname, fname in lec_names:
-        db.execute("INSERT INTO users (username, password, role, full_name, email, department_id) VALUES (?,?,?,?,?,?)",
-                   (uname, 'password', 'lecturer', fname, f'{uname}@uni.edu', dept_id))
+    lecturers = [
+        ('mhlanganiso','Mr Mhlanganiso','mhlanganiso'), ('mhlanga','Mr Mhlanga','mhlana'),
+        ('zano','Mr Zano','zano'), ('sakala','Dr Sakala','salaka'),
+        ('chituma','Mr Chituma','chituma'), ('ndumiyana','Mr Ndumiyana','ndumiyana'),
+        ('chikwiriro','Mr Chikwiriro','chikwiriro'), ('chaitezvi','Mr Chaitezvi','chaitezvi'),
+        ('katsinde','Dr Katsinde','katsinde'),
+    ]
+    for uname, fname, pw in lecturers:
+        db.execute("INSERT OR IGNORE INTO users (username, password, role, full_name, email, department_id) VALUES (?,?,?,?,?,?)",
+                   (uname, pw, 'lecturer', fname, f'{uname}@buse.ac.zw', dept_cs))
     lec_map = {l['username']: l['id'] for l in db.execute("SELECT id, username FROM users WHERE role='lecturer'").fetchall()}
 
-    color_lec = {'Yellow':['mhlangamiso','chituna'],'Green':['mhlangamiso','chaitezvi'],'Orange':['zano'],
-                 'Purple':['sakala'],'Light Blue':['ndumiyana'],'Pink/Red':['chikwiriro'],
-                 'Red':['sakala'],'Brown':['mhlanga']}
-    def get_lec(c): return lec_map[color_lec.get(c,['sakala'])[0]]
-
-    # Courses
-    courses_list = [
-        'CS216','CSH116','SWE115','CS214','NWE214','SWE212','SWE214','NWE216',
-        'SWE211','EEE2203','NWE411','C112','EEE1204','AMT114','SWE201','CS412',
-        'CS218','CS201','CSH115','NWE111','SWE114','NWE410','SWE416','SWE112','SWE205','SWE215'
+    courses_data = [
+        ('VB.NET','SWE112','single',lec_map['mhlanganiso'],'1.1',2.0,'#248b23'),
+        ('SWE205','SWE205','single',lec_map['mhlanganiso'],'2.1',2.0,'#38bf36'),
+        ('OOP1','CS112','department',lec_map['mhlanganiso'],'1.2',4.0,'#43b135'),
+        ('NWE411','NWE411','single',lec_map['mhlanga'],'4.1',4.0,'#b3a8a8'),
+        ('SWE416','SWE416','single',lec_map['mhlanga'],'4.1',4.0,'#929eaa'),
+        ('GROUP PROJECT','CS218','single',lec_map['zano'],'2.2',4.0,'#640b6a'),
+        ('INTERNET AND WEB DESIGN','CS214','department',lec_map['zano'],'2.2',4.0,'#7a0d82'),
+        ('MINI PROJECT','SWE214','single',lec_map['sakala'],'2.2',4.0,'#63370d'),
+        ('SOFTWARE ENGINEERING','CS216','department',lec_map['chituma'],'1.2',4.0,'#c8ff00'),
+        ('DATABASE CONCERPT','CS201','department',lec_map['chituma'],'1.2',4.0,'#c8ff00'),
+        ('NWE410','NWE410','single',lec_map['chituma'],'4.2',4.0,'#e1ff00'),
+        ('NWE216','NWE216','university',lec_map['ndumiyana'],'2.2',4.0,'#d98a4a'),
+        ('OOP2','SWE211','department',lec_map['chikwiriro'],'2.2',4.0,'#ff0000'),
+        ('CS412','CS412','single',lec_map['chaitezvi'],'4.2',4.0,'#00ffb3'),
+        ('CITIZENSHIP','PC108','university',lec_map['katsinde'],'1.1',4.0,'#4a90d9'),
     ]
-    for code in courses_list:
+    for name, code, level, lid, grp, dur, color in courses_data:
         db.execute("INSERT INTO courses (name, code, level, lecturer_id, group_name, duration_hours, color, department_id) VALUES (?,?,?,?,?,?,?,?)",
-                   (code, code, 'department', lec_map['sakala'], 'A', 2.0, '#4A90D9', dept_id))
-    c_map = {c['code']: c['id'] for c in db.execute("SELECT id, code FROM courses").fetchall()}
+                   (name, code, level, lid, grp, dur, color, dept_cs))
 
-    # Timetable entries
-    time_slots = [('0750','0950'),('1000','1200'),('1210','1410'),('1415','1615'),('1620','1820')]
-    entries = [
-        (0,'Monday','FSE HALL','F06','CS216/CSH116/SWE115','Yellow'),
-        (0,'Monday','FSE HALL','F10','CS214/NWE214/SWE212','Purple'),
-        (0,'Tuesday','PC108','F06','SWE214','Brown'),
-        (0,'Tuesday','PC108','F10','NWE216','Pink/Red'),
-        (0,'Wednesday','FSE HALL','F10','SWE211/EEE2203','Red'),
-        (0,'Thursday','FSE HALL','F06','NWE411','Light Blue'),
-        (0,'Thursday','FSE HALL','F10','C112/EEE1204/AMT114/SWE201','Light Blue'),
-        (0,'Friday','FSE HALL','F10','CS412','Green'),
-        (1,'Monday','FSE HALL','F06','CS216/CSH116/SWE115','Yellow'),
-        (1,'Monday','FSE HALL','F10','CS214/NWE214/SWE212','Purple'),
-        (1,'Tuesday','PC108','F06','SWE214','Brown'),
-        (1,'Tuesday','PC108','F10','NWE216','Pink/Red'),
-        (1,'Wednesday','FSE HALL','F10','SWE211/EEE2203','Red'),
-        (1,'Thursday','FSE HALL','F06','NWE411','Light Blue'),
-        (1,'Thursday','FSE HALL','F10','C112/EEE1204/AMT114/SWE201','Light Blue'),
-        (1,'Friday','FSE HALL','F10','CS412','Green'),
-        (2,'Monday','FSE HALL','F06','CS218','Purple'),
-        (2,'Monday','FSE HALL','F10','CS201/CSH115/NWE111/SWE114','Purple'),
-        (2,'Tuesday','PC108','F06','NWE410','Yellow'),
-        (2,'Thursday','FSE HALL','F06','SWE416','Light Blue'),
-        (2,'Thursday','FSE HALL','F10','SWE112','Green'),
-        (2,'Friday','FSE HALL','F06','SWE215','Green'),
-        (3,'Monday','FSE HALL','F06','CS218','Purple'),
-        (3,'Monday','FSE HALL','F10','CS201/CSH115/NWE111/SWE114','Purple'),
-        (3,'Tuesday','PC108','F06','NWE410','Yellow'),
-        (3,'Thursday','FSE HALL','F06','SWE416','Light Blue'),
-        (3,'Thursday','FSE HALL','F10','SWE205','Green'),
-        (3,'Friday','FSE HALL','F06','SWE215','Green'),
-    ]
-    for si, day, venue, group, codes_str, color in entries:
-        st, et = time_slots[si]
-        lec = get_lec(color)
-        for code in codes_str.split('/'):
-            cid = c_map.get(code.strip())
-            if cid:
-                db.execute("INSERT INTO timetable_entries (course_id,lecturer_id,room_id,day,start_time,end_time,group_name,published) VALUES (?,?,?,?,?,?,?,?)",
-                           (cid, lec, room_map[venue], day, f'{st[:2]}:{st[2:]}', f'{et[:2]}:{et[2:]}', group, 1))
-
-    # App settings
     if db.pg:
         db.execute("INSERT INTO app_settings (key, value) VALUES (%s, %s) ON CONFLICT (key) DO UPDATE SET value = %s",
-                   ('timetable_published', '1', '1'))
+                   ('timetable_published', '0', '0'))
     else:
-        db.execute("INSERT OR REPLACE INTO app_settings (key, value) VALUES (?,?)", ('timetable_published', '1'))
+        db.execute("INSERT OR REPLACE INTO app_settings (key, value) VALUES (?,?)", ('timetable_published', '0'))
 
     db.commit()
     db.close()
