@@ -3,7 +3,7 @@ from datetime import time, datetime, timedelta
 from models import get_db
 import random
 
-BREAK_MINUTES = 15
+BREAK_MINUTES = 0
 BREAK_START = time(10, 0)
 BREAK_END = time(10, 15)
 LUNCH_MINUTES = 30
