@@ -34,6 +34,7 @@ class DocumentParser:
     """Main parser class for university timetable documents."""
 
     def __init__(self):
+        self.all_lecturers = []
         # Header synonyms mapping
         self.code_headers = ['code', 'course code', 'courseid', 'cid', 'subject code', 'module code']
         self.name_headers = ['course name', 'name', 'title', 'subject', 'course', 'course title', 'subject name']
@@ -177,7 +178,7 @@ class DocumentParser:
         if not OPENPYXL_AVAILABLE:
             return {'courses': [], 'lecturers': [], 'rooms': [], 'notes': 'openpyxl not installed'}
 
-        self.all_lecturers = []  # Initialize lecturers list
+        self.all_lecturers = []  # Reset lecturers list
         result = {'courses': [], 'lecturers': [], 'rooms': [], 'source_file': filepath}
 
         try:
@@ -528,15 +529,59 @@ class DocumentParser:
 
     def parse_all_formats(self, filepath: str) -> Dict[str, Any]:
         """Parse document based on file extension."""
-        ext = filepath.lower().endswith('.xlsx') or filepath.lower().endswith('.xls')
-        if ext and OPENPYXL_AVAILABLE:
+        ext = filepath.lower()
+        if (ext.endswith('.xlsx') or ext.endswith('.xls')) and OPENPYXL_AVAILABLE:
             return self.parse_excel_file(filepath)
 
-        ext = filepath.lower().endswith('.docx')
-        if ext and DOCX_AVAILABLE:
+        if ext.endswith('.docx') and DOCX_AVAILABLE:
             return self.parse_word_file(filepath)
 
+        if ext.endswith('.csv'):
+            return self.parse_csv_file(filepath)
+
         return {'courses': [], 'lecturers': [], 'rooms': [], 'notes': f'Unsupported or missing parser for {filepath}'}
+
+    def parse_csv_file(self, filepath: str) -> Dict[str, Any]:
+        """Parse CSV file and return structured data."""
+        import csv
+        import io
+        
+        self.all_lecturers = []
+        result = {'courses': [], 'lecturers': [], 'rooms': [], 'source_file': filepath}
+
+        try:
+            with open(filepath, 'r', encoding='utf-8-sig') as f:
+                content = f.read()
+        except UnicodeDecodeError:
+            try:
+                with open(filepath, 'r', encoding='latin-1') as f:
+                    content = f.read()
+            except Exception as e:
+                return {'courses': [], 'lecturers': [], 'rooms': [], 'notes': f'Failed to read CSV file: {str(e)}'}
+        except Exception as e:
+            return {'courses': [], 'lecturers': [], 'rooms': [], 'notes': f'Failed to read CSV file: {str(e)}'}
+
+        try:
+            reader = csv.DictReader(io.StringIO(content))
+            rows = list(reader)
+        except Exception as e:
+            return {'courses': [], 'lecturers': [], 'rooms': [], 'notes': f'Failed to parse CSV: {str(e)}'}
+
+        if not rows:
+            return {'courses': [], 'lecturers': [], 'rooms': [], 'notes': 'CSV file is empty'}
+
+        # Map columns
+        col_map = self._map_columns(list(rows[0].keys()))
+
+        for row_idx, row in enumerate(rows, 2):
+            # Convert DictReader row to list format expected by _process_excel_row
+            row_values = [row.get(h, '') for h in reader.fieldnames]
+            course_data = self._process_excel_row(row_values, col_map, 'CSV', row_idx)
+            if course_data:
+                result['courses'].append(course_data)
+
+        result['lecturers'] = self.all_lecturers
+        return result
 
     def export_to_json(self, parsed_data: Dict[str, Any]) -> str:
         """Export parsed data to JSON format matching the schema."""

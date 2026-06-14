@@ -677,13 +677,22 @@ def admin_upload_documents():
     file.save(tmp.name)
     tmp.close()
 
-    # Parse using the document parser
-    parser = DocumentParser()
-    parsed_data = parser.parse_all_formats(tmp.name)
+    try:
+        # Parse using the document parser
+        parser = DocumentParser()
+        parsed_data = parser.parse_all_formats(tmp.name)
+    except Exception as e:
+        import os
+        os.unlink(tmp.name)
+        flash(f'Failed to parse file: {str(e)}', 'error')
+        return redirect(url_for('admin_upload_documents'))
     
     # Clean up temp file
     import os
-    os.unlink(tmp.name)
+    try:
+        os.unlink(tmp.name)
+    except:
+        pass
 
     if parsed_data.get('errors') or (not parsed_data.get('courses') and not parsed_data.get('lecturers') and not parsed_data.get('rooms')):
         flash(f'No parsable data found: {parsed_data.get("notes", "")}', 'warning')

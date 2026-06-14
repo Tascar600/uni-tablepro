@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% block title %}Upload Documents - MyBuse Course Timetable{% endblock %}
 {% block page_title %}Upload Documents{% endblock %}
-{% block page_subtitle %}Import courses and lecturers from Excel or CSV{% endblock %}
+{% block page_subtitle %}Import courses and lecturers from Excel, Word, PowerPoint, or CSV{% endblock %}
 
 {% block content %}
 {% if results %}
@@ -23,11 +23,63 @@
 {% if preview %}
 <div class="card" style="border-left:4px solid var(--accent-primary);margin-bottom:1.5rem">
     <div class="card-header"><h3>&#128269; Preview - Review Before Import</h3></div>
-    <p class="text-muted mb-2">Columns detected: <strong>{{ headers|join(', ') }}</strong></p>
-    <div class="table-wrapper"><table><thead><tr>{% for h in headers %}<th>{{ h }}</th>{% endfor %}</tr></thead><tbody>
-    {% for row in sample_rows %}<tr>{% for h in headers %}<td>{{ row[h] if row[h] else '-' }}</td>{% endfor %}</tr>{% endfor %}
-    </tbody></table></div>
-    <form method="POST" enctype="multipart/form-data" style="margin-top:1rem">
+    <p class="text-muted mb-2"><strong>{{ filename }}</strong> parsed successfully</p>
+    
+    {% if courses %}
+    <div class="card mb-2">
+        <div class="card-header"><h4>Courses ({{ courses|length }})</h4></div>
+        <div class="table-wrapper">
+            <table><thead><tr><th>Code</th><th>Name</th><th>Lecturer</th><th>Duration</th><th>Group</th><th>Max Students</th></tr></thead>
+            <tbody>
+            {% for c in courses %}
+            <tr>
+                <td>{{ c.course_code }}</td>
+                <td>{{ c.course_name }}</td>
+                <td>{{ c.lecturer_username or 'TBA' }}</td>
+                <td>{{ c.duration_hours }}h</td>
+                <td>{{ c.group }}</td>
+                <td>{{ c.max_students }}</td>
+            </tr>
+            {% endfor %}
+            </tbody></table>
+        </div>
+    </div>
+    {% endif %}
+    
+    {% if lecturers %}
+    <div class="card mb-2">
+        <div class="card-header"><h4>Lecturers ({{ lecturers|length }})</h4></div>
+        <div class="table-wrapper">
+            <table><thead><tr><th>Full Name</th><th>Username</th><th>Email</th><th>Password</th></tr></thead>
+            <tbody>
+            {% for l in lecturers %}
+            <tr>
+                <td>{{ l.full_name }}</td>
+                <td>{{ l.username }}</td>
+                <td>{{ l.email }}</td>
+                <td>1234</td>
+            </tr>
+            {% endfor %}
+            </tbody></table>
+        </div>
+    </div>
+    {% endif %}
+    
+    {% if rooms %}
+    <div class="card mb-2">
+        <div class="card-header"><h4>Rooms ({{ rooms|length }})</h4></div>
+        <div class="table-wrapper">
+            <table><thead><tr><th>Room Code</th><th>Capacity</th></tr></thead>
+            <tbody>
+            {% for r in rooms %}
+            <tr><td>{{ r.room_code }}</td><td>{{ r.capacity or 'N/A' }}</td></tr>
+            {% endfor %}
+            </tbody></table>
+        </div>
+    </div>
+    {% endif %}
+    
+    <form method="POST" style="margin-top:1rem">
         <input type="hidden" name="confirm_import" value="1">
         <button type="submit" class="btn btn-success btn-lg">&#9989; Confirm Import</button>
         <a href="{{ url_for('admin_upload_documents') }}" class="btn btn-ghost">Cancel</a>
@@ -40,7 +92,7 @@
         <div class="card-header"><h3>Upload File</h3></div>
         <form method="POST" enctype="multipart/form-data">
             <input type="hidden" name="preview" value="1">
-            <div class="form-group"><label>Choose Excel (.xlsx, .xls) or CSV file</label><input type="file" name="file" accept=".xlsx,.xls,.csv" required style="padding:0.5rem 0"></div>
+            <div class="form-group"><label>Choose Excel (.xlsx, .xls), Word (.docx), PowerPoint (.pptx), or CSV (.csv)</label><input type="file" name="file" accept=".xlsx,.xls,.docx,.pptx,.csv" required style="padding:0.5rem 0"></div>
             <p class="text-muted mb-2">System auto-detects columns. You'll preview first before importing.</p>
             <button type="submit" class="btn btn-primary btn-lg">&#128196; Upload & Preview</button>
         </form>
@@ -56,8 +108,8 @@
 </div>
 
 <div class="card"><div class="card-header"><h3>How It Works</h3></div><ol class="text-muted" style="line-height:2">
-    <li><strong>Upload</strong> your Excel or CSV file with course data.</li>
-    <li><strong>Preview</strong> the detected columns and first 5 rows.</li>
+    <li><strong>Upload</strong> your Excel, Word, PowerPoint, or CSV file with course data.</li>
+    <li><strong>Preview</strong> the parsed courses, lecturers, and rooms.</li>
     <li><strong>Confirm</strong> to import — new lecturers created with:
         <br>— Username: surname (e.g. <code>dube</code>)
         <br>— Password: <code>1234</code>
