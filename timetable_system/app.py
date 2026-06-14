@@ -683,45 +683,38 @@ def admin_upload_documents():
         flash('No data found in the file.', 'warning')
         return redirect(url_for('admin_upload_documents'))
 
-    # Confirm import from preview
-    if request.form.get('confirm_import') == '1':
-        rows = session.pop('upload_rows', [])
-        col_map = session.pop('upload_col_map', {})
-        if not rows:
-            flash('Session expired. Please re-upload.', 'error')
-            return redirect(url_for('admin_upload_documents'))
-    else:
-        # Preview mode - show first 5 rows for confirmation
-        if request.form.get('preview') == '1':
-            session['upload_rows'] = rows
-            session['upload_col_map'] = col_map
-            return render_template('admin_upload.html', preview=True, headers=list(rows[0].keys()), sample_rows=rows[:5])
-
-        col_map = {}
+    # Build column map FIRST (used by both preview and confirm)
+    col_map = {}
     for h in rows[0]:
         hl = h.lower().strip().replace('_', ' ').replace('-', ' ')
-        # Course Code
         if any(k in hl for k in ['course code', 'course_code', 'subject code', 'module code', 'code']):
             col_map['code'] = h
-        # Course Name
         elif any(k in hl for k in ['course name', 'course_name', 'subject name', 'module name', 'course title', 'subject', 'module', 'name']):
             col_map['name'] = h
-        # Lecturer
         elif any(k in hl for k in ['lecturer', 'instructor', 'teacher', 'staff', 'facilitator']):
             col_map['lecturer'] = h
-        # Part/Level/Group
         elif any(k in hl for k in ['part', 'level', 'group', 'year', 'semester', 'class', 'section']):
             col_map['group'] = h
-        # Duration
         elif any(k in hl for k in ['duration', 'hours', 'hrs', 'credit', 'credits', 'contact hours']):
             col_map['duration'] = h
-        # Max Students
         elif any(k in hl for k in ['max students', 'students', 'capacity', 'max', 'enrollment', 'class size', 'number of students']):
             col_map['max_students'] = h
 
-    # Debug: show detected columns
     print(f"[UPLOAD] Headers: {list(rows[0].keys())}")
     print(f"[UPLOAD] Col map: {col_map}")
+
+    # Confirm import from preview
+    if request.form.get('confirm_import') == '1':
+        rows = session.pop('upload_rows', [])
+        col_map = session.pop('upload_col_map', col_map)  # fallback to current
+        if not rows:
+            flash('Session expired. Please re-upload.', 'error')
+            return redirect(url_for('admin_upload_documents'))
+    elif request.form.get('preview') == '1':
+        # Preview mode - show first 5 rows for confirmation
+        session['upload_rows'] = rows
+        session['upload_col_map'] = col_map
+        return render_template('admin_upload.html', preview=True, headers=list(rows[0].keys()), sample_rows=rows[:5])
 
     def _parse_lecturer_name(raw):
         raw = raw.strip()
