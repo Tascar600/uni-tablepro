@@ -671,11 +671,29 @@ def admin_upload_documents():
         tmp.close()
         wb = load_workbook(tmp.name, read_only=True, data_only=True)
         ws = wb.active
-        headers = [str(c.value).strip().lower() if c.value is not None else '' for c in next(ws.iter_rows(min_row=1, max_row=1))]
-        for row in ws.iter_rows(min_row=2, values_only=True):
-            if not any(cell is not None for cell in row):
+        
+        # Read first 5 rows to find the best header row
+        raw_rows = []
+        for row in ws.iter_rows(min_row=1, max_row=min(5, ws.max_row), values_only=True):
+            raw_rows.append([str(c).strip() if c is not None else '' for c in row])
+        
+        # Find header row by scoring against known column keywords
+        known_keywords = ['code', 'name', 'course', 'lecturer', 'instructor', 'teacher', 'part', 'level', 'group', 'duration', 'hours', 'student', 'capacity', 'subject', 'module']
+        best_row_idx = 0
+        best_score = -1
+        for idx, row in enumerate(raw_rows):
+            score = sum(1 for cell in row for kw in known_keywords if kw in cell.lower())
+            if score > best_score:
+                best_score = score
+                best_row_idx = idx
+        
+        headers = [h.lower() if h else '' for h in raw_rows[best_row_idx]]
+        data_rows = raw_rows[best_row_idx + 1:]
+        
+        for row_vals in data_rows:
+            if not any(v for v in row_vals):
                 continue
-            rows.append({headers[i]: str(row[i]).strip() if row[i] is not None else '' for i in range(len(headers))})
+            rows.append({headers[i]: row_vals[i] if i < len(row_vals) else '' for i in range(len(headers))})
         wb.close()
         os.unlink(tmp.name)
 
