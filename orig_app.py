@@ -1,4 +1,4 @@
-import json
+﻿import json
 import os
 import sqlite3
 import uuid
@@ -224,7 +224,7 @@ def dashboard():
 
     return redirect(url_for('login'))
 
-# ─── Admin Routes ──────────────────────────────────────────────────
+# ΓöÇΓöÇΓöÇ Admin Routes ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
 
 @app.route('/admin')
 @login_required
@@ -281,23 +281,11 @@ def admin_delete_lecturer(lecturer_id):
     db = get_db()
     lecturer = db.execute("SELECT * FROM users WHERE id=? AND role='lecturer'", (lecturer_id,)).fetchone()
     if lecturer:
-        for table, col in [('student_enrollments', 'student_id'),
-                           ('attendance_records', 'student_id'),
-                           ('timetable_entries', 'lecturer_id'),
-                           ('courses', 'lecturer_id'),
-                           ('substitute_allocations', 'original_lecturer_id'),
-                           ('substitute_allocations', 'substitute_lecturer_id'),
-                           ('lecturer_preferences', 'user_id'),
-                           ('lecturer_availability', 'lecturer_id'),
-                           ('activity_logs', 'user_id'),
-                           ('notifications', 'user_id'),
-                           ('timetable_versions', 'created_by'),
-                           ('draft_timetables', 'user_id'),
-                           ('conflict_resolutions', 'resolved_by')]:
-            try:
-                db.execute(f"DELETE FROM {table} WHERE {col}=?", (lecturer_id,))
-            except Exception:
-                pass
+        db.execute("DELETE FROM student_enrollments WHERE course_id IN (SELECT id FROM courses WHERE lecturer_id=?)", (lecturer_id,))
+        db.execute("DELETE FROM timetable_entries WHERE lecturer_id=?", (lecturer_id,))
+        db.execute("DELETE FROM courses WHERE lecturer_id=?", (lecturer_id,))
+        db.execute("DELETE FROM lecturer_preferences WHERE user_id=?", (lecturer_id,))
+        db.execute("DELETE FROM lecturer_availability WHERE lecturer_id=?", (lecturer_id,))
         db.execute("DELETE FROM users WHERE id=?", (lecturer_id,))
         db.commit()
         log_activity(session['user_id'], 'delete_lecturer', f'Deleted lecturer: {lecturer["full_name"]}')
@@ -634,162 +622,7 @@ def admin_live_tv():
     return render_template('live_tv.html', timetable=timetable)
 
 
-# ─── Document Upload ───────────────────────────────────────────────
-
-@app.route('/admin/upload-documents', methods=['GET', 'POST'])
-@login_required
-@role_required('admin')
-def admin_upload_documents():
-    if request.method == 'GET':
-        return render_template('admin_upload.html')
-
-    if 'file' not in request.files:
-        flash('No file uploaded.', 'error')
-        return redirect(url_for('admin_upload_documents'))
-
-    file = request.files['file']
-    if not file.filename:
-        flash('No file selected.', 'error')
-        return redirect(url_for('admin_upload_documents'))
-
-    ext = os.path.splitext(file.filename)[1].lower()
-    if ext not in ('.xlsx', '.xls', '.csv'):
-        flash('Please upload an Excel (.xlsx, .xls) or CSV (.csv) file.', 'error')
-        return redirect(url_for('admin_upload_documents'))
-
-    import csv, io, re, tempfile
-    from openpyxl import load_workbook
-
-    rows = []
-    if ext == '.csv':
-        content = file.read().decode('utf-8-sig')
-        reader = csv.DictReader(io.StringIO(content))
-        rows = [row for row in reader]
-    else:
-        tmp = tempfile.NamedTemporaryFile(delete=False, suffix=ext)
-        file.save(tmp.name)
-        tmp.close()
-        wb = load_workbook(tmp.name, read_only=True, data_only=True)
-        ws = wb.active
-        headers = [str(c.value).strip().lower() if c.value is not None else '' for c in next(ws.iter_rows(min_row=1, max_row=1))]
-        for row in ws.iter_rows(min_row=2, values_only=True):
-            if not any(cell is not None for cell in row):
-                continue
-            rows.append({headers[i]: str(row[i]).strip() if row[i] is not None else '' for i in range(len(headers))})
-        wb.close()
-        os.unlink(tmp.name)
-
-    if not rows:
-        flash('No data found in the file.', 'warning')
-        return redirect(url_for('admin_upload_documents'))
-
-    col_map = {}
-    for h in rows[0]:
-        hl = h.lower().strip()
-        if hl in ('course code', 'code', 'subject code', 'module code', 'course_code'):
-            col_map['code'] = h
-        elif hl in ('course name', 'course', 'subject', 'subject name', 'module', 'module name', 'course_name'):
-            col_map['name'] = h
-        elif hl in ('lecturer', 'lecturer name', 'instructor', 'teacher', 'lecturer_name', 'lecturers name', 'lecturer\'s name'):
-            col_map['lecturer'] = h
-        elif hl in ('part', 'level', 'group', 'year', 'part/level', 'level/part', 'part_level', 'group_name', 'semester'):
-            col_map['group'] = h
-        elif hl in ('duration', 'hours', 'duration hours', 'duration_hours', 'hrs', 'duration (hrs)'):
-            col_map['duration'] = h
-        elif hl in ('max students', 'students', 'capacity', 'max', 'no of students', 'number of students', 'max_students', 'students count'):
-            col_map['max_students'] = h
-
-    def _parse_lecturer_name(raw):
-        raw = raw.strip()
-        raw = re.sub(r'\s+', ' ', raw)
-        raw = re.sub(r'^(mr|mrs|ms|miss|dr|prof|eng|sir|madam)\s+', '', raw, flags=re.IGNORECASE).strip()
-        parts = raw.split()
-        if not parts:
-            return None, None, None, None
-        surname = parts[-1]
-        if len(parts) > 1:
-            first = parts[0].rstrip('.')
-            if len(first) == 1 and first.isalpha():
-                initial = first.lower()
-            else:
-                initial = first[0].lower() if first else surname[0].lower()
-        else:
-            initial = surname[0].lower()
-        username = surname.lower()
-        email = f"{initial}{surname.lower()}@buse.ac.zw"
-        return initial, surname, username, email
-
-    db = get_db()
-    results = {'lecturers_created': 0, 'lecturers_skipped': 0, 'courses_created': 0, 'courses_skipped': 0, 'errors': []}
-
-    for row in rows:
-        code = row.get(col_map.get('code', ''), '').strip()
-        if not code:
-            continue
-        name = row.get(col_map.get('name', ''), '').strip()
-        if not name:
-            name = code
-        lecturer_raw = row.get(col_map.get('lecturer', ''), '').strip()
-        group = row.get(col_map.get('group', ''), '').strip()
-        if not group:
-            group = '1.1'
-        dur_raw = row.get(col_map.get('duration', ''), '').strip()
-        try:
-            duration = float(dur_raw) if dur_raw else 4.0
-        except ValueError:
-            duration = 4.0
-        stu_raw = row.get(col_map.get('max_students', ''), '').strip()
-        try:
-            max_students = int(stu_raw) if stu_raw else 50
-        except ValueError:
-            max_students = 50
-
-        if lecturer_raw and lecturer_raw.upper() not in ('TBA', 'TBC', 'N/A', ''):
-            _, _, lec_username, lec_email = _parse_lecturer_name(lecturer_raw)
-            if lec_username:
-                existing = db.execute("SELECT id FROM users WHERE username=? AND role='lecturer'", (lec_username,)).fetchone()
-                if not existing:
-                    try:
-                        db.execute("INSERT INTO users (username, password, role, full_name, email) VALUES (?,?,?,?,?)",
-                                   (lec_username, '1234', 'lecturer', lecturer_raw.strip(), lec_email))
-                        db.commit()
-                        results['lecturers_created'] += 1
-                        existing_id = db.execute("SELECT id FROM users WHERE username=? AND role='lecturer'", (lec_username,)).fetchone()['id']
-                    except Exception as e:
-                        results['errors'].append(f"Failed to create lecturer {lecturer_raw}: {str(e)}")
-                        db.rollback()
-                        continue
-                else:
-                    existing_id = existing['id']
-                    results['lecturers_skipped'] += 1
-            else:
-                results['errors'].append(f"Could not parse lecturer name: {lecturer_raw}")
-                continue
-        else:
-            existing_id = None
-
-        existing_course = db.execute("SELECT id FROM courses WHERE code=? AND group_name=?", (code, group)).fetchone()
-        if existing_course:
-            results['courses_skipped'] += 1
-            continue
-
-        try:
-            db.execute("""INSERT INTO courses (name, code, level, lecturer_id, group_name, duration_hours, color, max_students)
-                          VALUES (?,?,?,?,?,?,?,?)""",
-                       (name, code, 'department', existing_id or 1, group, duration, '#4A90D9', max_students))
-            db.commit()
-            results['courses_created'] += 1
-        except Exception as e:
-            results['errors'].append(f"Failed to create course {name} ({code}): {str(e)}")
-            db.rollback()
-
-    db.close()
-
-    log_activity(session['user_id'], 'upload_documents',
-                 f'Uploaded {file.filename}: {results["courses_created"]} courses created, {results["lecturers_created"]} lecturers created, {results["courses_skipped"]} skipped')
-    return render_template('admin_upload.html', results=results)
-
-# ─── Lecturer Routes ───────────────────────────────────────────────
+# ΓöÇΓöÇΓöÇ Lecturer Routes ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
 
 @app.route('/lecturer')
 @login_required
@@ -893,7 +726,7 @@ def lecturer_availability():
     return render_template('lecturer_availability.html', availability=[dict(a) for a in availability])
 
 
-# ─── Student Routes ────────────────────────────────────────────────
+# ΓöÇΓöÇΓöÇ Student Routes ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
 
 @app.route('/student')
 @login_required
@@ -915,7 +748,7 @@ def student_shared_feed(token):
     return render_template('shared_timetable.html', timetable=entries)
 
 
-# ─── API Routes ────────────────────────────────────────────────────
+# ΓöÇΓöÇΓöÇ API Routes ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
 
 @app.route('/api/timetable')
 def api_timetable():
@@ -1390,8 +1223,7 @@ def seed_migration():
         return jsonify({'error': 'unauthorized'}), 403
     try:
         seed_force()
-        seed_data()
-        return jsonify({'status': 'ok', 'message': 'Database reseeded with your local data'})
+        return jsonify({'status': 'ok', 'message': 'Database reseeded with new timetable data'})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
