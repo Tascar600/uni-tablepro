@@ -8,38 +8,30 @@
 <div class="card" style="border-left:4px solid var(--accent-success);margin-bottom:1.5rem">
     <div class="card-header"><h3>&#9989; Import Complete</h3></div>
     <div class="stats-grid" style="grid-template-columns:repeat(auto-fit,minmax(140px,1fr))">
-        <div class="stat-card">
-            <div class="stat-number" style="color:var(--accent-success)">{{ results.courses_created }}</div>
-            <div class="stat-label">Courses Added</div>
-        </div>
-        <div class="stat-card">
-            <div class="stat-number" style="color:var(--accent-primary)">{{ results.lecturers_created }}</div>
-            <div class="stat-label">Lecturers Created</div>
-        </div>
-        <div class="stat-card">
-            <div class="stat-number" style="color:var(--accent-warning)">{{ results.courses_skipped }}</div>
-            <div class="stat-label">Skipped (duplicates)</div>
-        </div>
-        <div class="stat-card">
-            <div class="stat-number" style="color:var(--accent-secondary)">{{ results.lecturers_skipped }}</div>
-            <div class="stat-label">Lecturers Skipped (exists)</div>
-        </div>
+        <div class="stat-card"><div class="stat-number" style="color:var(--accent-success)">{{ results.courses_created }}</div><div class="stat-label">Courses Added</div></div>
+        <div class="stat-card"><div class="stat-number" style="color:var(--accent-primary)">{{ results.lecturers_created }}</div><div class="stat-label">Lecturers Created</div></div>
+        <div class="stat-card"><div class="stat-number" style="color:var(--accent-warning)">{{ results.courses_skipped }}</div><div class="stat-label">Skipped (duplicates)</div></div>
+        <div class="stat-card"><div class="stat-number" style="color:var(--accent-secondary)">{{ results.lecturers_skipped }}</div><div class="stat-label">Lecturers Skipped (exists)</div></div>
     </div>
     {% if results.errors %}
-    <div class="alert alert-warning mt-2">
-        <strong>{{ results.errors|length }} warning(s):</strong>
-        <ul style="margin:0.5rem 0 0;padding-left:1.25rem">
-            {% for err in results.errors %}
-            <li>{{ err }}</li>
-            {% endfor %}
-        </ul>
-    </div>
+    <div class="alert alert-warning mt-2"><strong>{{ results.errors|length }} warning(s):</strong><ul style="margin:0.5rem 0 0;padding-left:1.25rem">{% for err in results.errors %}<li>{{ err }}</li>{% endfor %}</ul></div>
     {% endif %}
-    <div class="btn-group mt-2">
-        <a href="{{ url_for('admin_courses') }}" class="btn btn-primary">View Courses</a>
-        <a href="{{ url_for('admin_lecturers') }}" class="btn btn-secondary">View Lecturers</a>
-        <a href="{{ url_for('admin_upload_documents') }}" class="btn btn-ghost">Upload Another File</a>
-    </div>
+    <div class="btn-group mt-2"><a href="{{ url_for('admin_courses') }}" class="btn btn-primary">View Courses</a><a href="{{ url_for('admin_lecturers') }}" class="btn btn-secondary">View Lecturers</a><a href="{{ url_for('admin_upload_documents') }}" class="btn btn-ghost">Upload Another</a></div>
+</div>
+{% endif %}
+
+{% if preview %}
+<div class="card" style="border-left:4px solid var(--accent-primary);margin-bottom:1.5rem">
+    <div class="card-header"><h3>&#128269; Preview - Review Before Import</h3></div>
+    <p class="text-muted mb-2">Columns detected: <strong>{{ headers|join(', ') }}</strong></p>
+    <div class="table-wrapper"><table><thead><tr>{% for h in headers %}<th>{{ h }}</th>{% endfor %}</tr></thead><tbody>
+    {% for row in sample_rows %}<tr>{% for h in headers %}<td>{{ row[h] if row[h] else '-' }}</td>{% endfor %}</tr>{% endfor %}
+    </tbody></table></div>
+    <form method="POST" enctype="multipart/form-data" style="margin-top:1rem">
+        <input type="hidden" name="confirm_import" value="1">
+        <button type="submit" class="btn btn-success btn-lg">&#9989; Confirm Import</button>
+        <a href="{{ url_for('admin_upload_documents') }}" class="btn btn-ghost">Cancel</a>
+    </form>
 </div>
 {% endif %}
 
@@ -47,49 +39,30 @@
     <div class="card">
         <div class="card-header"><h3>Upload File</h3></div>
         <form method="POST" enctype="multipart/form-data">
-            <div class="form-group">
-                <label>Choose Excel (.xlsx, .xls) or CSV file</label>
-                <input type="file" name="file" accept=".xlsx,.xls,.csv" required style="padding:0.5rem 0">
-            </div>
-            <p class="text-muted mb-2">The system will automatically detect columns by header name and import both lecturers and courses.</p>
-            <button type="submit" class="btn btn-primary btn-lg">&#128196; Upload & Import</button>
+            <div class="form-group"><label>Choose Excel (.xlsx, .xls) or CSV file</label><input type="file" name="file" accept=".xlsx,.xls,.csv" required style="padding:0.5rem 0"></div>
+            <p class="text-muted mb-2">System auto-detects columns. You'll preview first before importing.</p>
+            <button type="submit" class="btn btn-primary btn-lg">&#128196; Upload & Preview</button>
         </form>
     </div>
-
-    <div class="card">
-        <div class="card-header"><h3>Column Guide</h3></div>
-        <p class="text-muted mb-1">Your file should have these columns (headers are matched automatically):</p>
-        <table>
-            <thead>
-                <tr><th>Column Header</th><th>Required</th><th>Default</th></tr>
-            </thead>
-            <tbody>
-                <tr><td><code>Course Code</code> / <code>Code</code></td><td>Yes</td><td>—</td></tr>
-                <tr><td><code>Course Name</code> / <code>Course</code></td><td>No</td><td>Uses course code</td></tr>
-                <tr><td><code>Lecturer</code> / <code>Lecturer Name</code></td><td>No</td><td>TBA (edit later)</td></tr>
-                <tr><td><code>Part</code> / <code>Level</code> / <code>Group</code></td><td>No</td><td><code>1.1</code></td></tr>
-                <tr><td><code>Duration</code> / <code>Hours</code></td><td>No</td><td><code>4</code> hours</td></tr>
-                <tr><td><code>Max Students</code> / <code>Students</code></td><td>No</td><td><code>50</code></td></tr>
-            </tbody>
-        </table>
-    </div>
+    <div class="card"><div class="card-header"><h3>Column Guide</h3></div><p class="text-muted mb-1">Headers matched automatically (flexible naming):</p><table><thead><tr><th>Column</th><th>Required</th><th>Default</th></tr></thead><tbody>
+        <tr><td><code>Course Code</code> / <code>Code</code></td><td>Yes</td><td>—</td></tr>
+        <tr><td><code>Course Name</code> / <code>Course</code></td><td>No</td><td>Uses course code</td></tr>
+        <tr><td><code>Lecturer</code> / <code>Instructor</code></td><td>No</td><td>TBA (edit later)</td></tr>
+        <tr><td><code>Part</code> / <code>Level</code> / <code>Group</code></td><td>No</td><td><code>1.1</code></td></tr>
+        <tr><td><code>Duration</code> / <code>Hours</code></td><td>No</td><td><code>4</code> hours</td></tr>
+        <tr><td><code>Max Students</code> / <code>Students</code></td><td>No</td><td><code>50</code></td></tr>
+    </tbody></table></div>
 </div>
 
-<div class="card">
-    <div class="card-header"><h3>How It Works</h3></div>
-    <ol class="text-muted" style="line-height:2">
-        <li><strong>Upload</strong> your Excel or CSV file with course data.</li>
-        <li><strong>New lecturers</strong> are automatically created with:
-            <br>— Username: surname (e.g. <code>dube</code>)
-            <br>— Password: <code>1234</code>
-            <br>— Email: <code>fdube@buse.ac.zw</code> format</li>
-        <li><strong>New courses</strong> are created with:
-            <br>— Duration: 4 hours (default)
-            <br>— Color: Blue
-            <br>— Max students: 50 (default)
-            <br>— Level/department left blank for admin to edit</li>
-        <li><strong>Existing</strong> lecturers (same surname) and courses (same code + group) are skipped.</li>
-        <li>After import, go to <strong>Courses</strong> and <strong>Lecturers</strong> to review and edit.</li>
-    </ol>
-</div>
+<div class="card"><div class="card-header"><h3>How It Works</h3></div><ol class="text-muted" style="line-height:2">
+    <li><strong>Upload</strong> your Excel or CSV file with course data.</li>
+    <li><strong>Preview</strong> the detected columns and first 5 rows.</li>
+    <li><strong>Confirm</strong> to import — new lecturers created with:
+        <br>— Username: surname (e.g. <code>dube</code>)
+        <br>— Password: <code>1234</code>
+        <br>— Email: <code>fdube@buse.ac.zw</code> format</li>
+    <li>Courses get defaults: 4h duration, Blue color, 50 max students, blank level/department.</li>
+    <li>Existing lecturers/courses (same surname or code+group) are skipped.</li>
+    <li>After import, edit in <strong>Courses</strong> / <strong>Lecturers</strong> pages.</li>
+</ol></div>
 {% endblock %}
