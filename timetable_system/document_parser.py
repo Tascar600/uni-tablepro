@@ -177,6 +177,7 @@ class DocumentParser:
         if not OPENPYXL_AVAILABLE:
             return {'courses': [], 'lecturers': [], 'rooms': [], 'notes': 'openpyxl not installed'}
 
+        self.all_lecturers = []  # Initialize lecturers list
         result = {'courses': [], 'lecturers': [], 'rooms': [], 'source_file': filepath}
 
         try:
@@ -221,6 +222,8 @@ class DocumentParser:
 
             wb.close()
 
+        # Add lecturers to result
+        result['lecturers'] = self.all_lecturers
         return result
 
     def _map_columns(self, headers: List[str]) -> Dict[str, int]:
@@ -409,6 +412,7 @@ class DocumentParser:
                 if course_data:
                     result['courses'].append(course_data)
 
+        result['lecturers'] = self.all_lecturers
         return result
 
     def _process_table_row(self, row_values: List[str], col_map: Dict[str, int], source_loc: str, row_idx: int) -> Optional[Dict]:

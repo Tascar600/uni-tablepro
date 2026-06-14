@@ -648,16 +648,11 @@ def admin_upload_documents():
 
     # Handle confirm import from preview (no file in this request)
     if request.form.get('confirm_import') == '1':
-        rows = session.pop('upload_rows', [])
-        col_map = session.pop('upload_col_map', {})
+        parsed_data = session.pop('upload_parsed_data', {})
         filename = session.pop('upload_filename', 'preview')
-        if not rows:
+        if not parsed_data:
             flash('Session expired. Please re-upload.', 'error')
             return redirect(url_for('admin_upload_documents'))
-        # Parse using the document parser
-        parser = DocumentParser()
-        parsed_data = parser.parse_all_formats('dummy_file_for_import')
-        # Use the parsed data to create courses and lecturers
         result = admin_process_parsed_data(parsed_data, filename)
         return result
 
@@ -796,102 +791,7 @@ def admin_process_parsed_data(parsed_data: Dict, filename: str) -> Any:
         flash(f'Import failed: {str(e)}', 'error')
         return redirect(url_for('admin_upload_documents'))
 
-    def _parse_lecturer_name(raw):
-        raw = raw.strip()
-        raw = re.sub(r'\s+', ' ', raw)
-        raw = re.sub(r'^(mr|mrs|ms|miss|dr|prof|eng|sir|madam)\s+', '', raw, flags=re.IGNORECASE).strip()
-        parts = raw.split()
-        if not parts:
-            return None, None, None, None
-        surname = parts[-1]
-        if len(parts) > 1:
-            first = parts[0].rstrip('.')
-            if len(first) == 1 and first.isalpha():
-                initial = first.lower()
-            else:
-                initial = first[0].lower() if first else surname[0].lower()
-        else:
-            initial = surname[0].lower()
-        username = surname.lower()
-        email = f"{initial}{surname.lower()}@buse.ac.zw"
-        return initial, surname, username, email
-
-    filename = file.filename if 'file' in request.files and request.files['file'].filename else session.get('upload_filename', 'preview')
-    db = get_db()
-    results = {'lecturers_created': 0, 'lecturers_skipped': 0, 'courses_created': 0, 'courses_skipped': 0, 'errors': []}
-
-    try:
-        for row in rows:
-            code = row.get(col_map.get('code', ''), '').strip()
-            if not code:
-                continue
-            name = row.get(col_map.get('name', ''), '').strip()
-            if not name:
-                name = code
-            lecturer_raw = row.get(col_map.get('lecturer', ''), '').strip()
-            group = row.get(col_map.get('group', ''), '').strip()
-            if not group:
-                group = '1.1'
-            dur_raw = row.get(col_map.get('duration', ''), '').strip()
-            try:
-                duration = float(dur_raw) if dur_raw else 4.0
-            except ValueError:
-                duration = 4.0
-            stu_raw = row.get(col_map.get('max_students', ''), '').strip()
-            try:
-                max_students = int(stu_raw) if stu_raw else 50
-            except ValueError:
-                max_students = 50
-
-            if lecturer_raw and lecturer_raw.upper() not in ('TBA', 'TBC', 'N/A', ''):
-                _, _, lec_username, lec_email = _parse_lecturer_name(lecturer_raw)
-                if lec_username:
-                    existing = db.execute("SELECT id FROM users WHERE username=? AND role='lecturer'", (lec_username,)).fetchone()
-                    if not existing:
-                        try:
-                            db.execute("INSERT INTO users (username, password, role, full_name, email) VALUES (?,?,?,?,?)",
-                                       (lec_username, '1234', 'lecturer', lecturer_raw.strip(), lec_email))
-                            db.commit()
-                            results['lecturers_created'] += 1
-                            existing_id = db.execute("SELECT id FROM users WHERE username=? AND role='lecturer'", (lec_username,)).fetchone()['id']
-                        except Exception as e:
-                            results['errors'].append(f"Failed to create lecturer {lecturer_raw}: {str(e)}")
-                            db.rollback()
-                            continue
-                    else:
-                        existing_id = existing['id']
-                        results['lecturers_skipped'] += 1
-                else:
-                    results['errors'].append(f"Could not parse lecturer name: {lecturer_raw}")
-                    continue
-            else:
-                existing_id = None
-
-            existing_course = db.execute("SELECT id FROM courses WHERE code=? AND group_name=?", (code, group)).fetchone()
-            if existing_course:
-                results['courses_skipped'] += 1
-                continue
-
-            try:
-                db.execute("""INSERT INTO courses (name, code, level, lecturer_id, group_name, duration_hours, color, max_students)
-                              VALUES (?,?,?,?,?,?,?,?)""",
-                           (name, code, 'department', existing_id or 1, group, duration, '#4A90D9', max_students))
-                db.commit()
-                results['courses_created'] += 1
-            except Exception as e:
-                results['errors'].append(f"Failed to create course {name} ({code}): {str(e)}")
-                db.rollback()
-
-        db.close()
-
-        log_activity(session['user_id'], 'upload_documents',
-                     f'Uploaded {filename}: {results["courses_created"]} courses created, {results["lecturers_created"]} lecturers created, {results["courses_skipped"]} skipped')
-    except Exception as e:
-        db.close()
-        flash(f'Import failed: {str(e)}', 'error')
-        return redirect(url_for('admin_upload_documents'))
-
-    return render_template('admin_upload.html', results=results)
+    return render_template('admin_upload.html', results=results, filename=filename)
 
 # ─── Lecturer Routes ───────────────────────────────────────────────
 
