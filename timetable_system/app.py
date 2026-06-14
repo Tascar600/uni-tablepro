@@ -735,6 +735,7 @@ def admin_upload_documents():
         # Preview mode - show first 5 rows for confirmation
         session['upload_rows'] = rows
         session['upload_col_map'] = col_map
+        session['upload_filename'] = file.filename
         return render_template('admin_upload.html', preview=True, headers=list(rows[0].keys()), sample_rows=rows[:5])
 
     def _parse_lecturer_name(raw):
@@ -757,74 +758,81 @@ def admin_upload_documents():
         email = f"{initial}{surname.lower()}@buse.ac.zw"
         return initial, surname, username, email
 
+    filename = file.filename if 'file' in request.files and request.files['file'].filename else session.get('upload_filename', 'preview')
     db = get_db()
     results = {'lecturers_created': 0, 'lecturers_skipped': 0, 'courses_created': 0, 'courses_skipped': 0, 'errors': []}
 
-    for row in rows:
-        code = row.get(col_map.get('code', ''), '').strip()
-        if not code:
-            continue
-        name = row.get(col_map.get('name', ''), '').strip()
-        if not name:
-            name = code
-        lecturer_raw = row.get(col_map.get('lecturer', ''), '').strip()
-        group = row.get(col_map.get('group', ''), '').strip()
-        if not group:
-            group = '1.1'
-        dur_raw = row.get(col_map.get('duration', ''), '').strip()
-        try:
-            duration = float(dur_raw) if dur_raw else 4.0
-        except ValueError:
-            duration = 4.0
-        stu_raw = row.get(col_map.get('max_students', ''), '').strip()
-        try:
-            max_students = int(stu_raw) if stu_raw else 50
-        except ValueError:
-            max_students = 50
-
-        if lecturer_raw and lecturer_raw.upper() not in ('TBA', 'TBC', 'N/A', ''):
-            _, _, lec_username, lec_email = _parse_lecturer_name(lecturer_raw)
-            if lec_username:
-                existing = db.execute("SELECT id FROM users WHERE username=? AND role='lecturer'", (lec_username,)).fetchone()
-                if not existing:
-                    try:
-                        db.execute("INSERT INTO users (username, password, role, full_name, email) VALUES (?,?,?,?,?)",
-                                   (lec_username, '1234', 'lecturer', lecturer_raw.strip(), lec_email))
-                        db.commit()
-                        results['lecturers_created'] += 1
-                        existing_id = db.execute("SELECT id FROM users WHERE username=? AND role='lecturer'", (lec_username,)).fetchone()['id']
-                    except Exception as e:
-                        results['errors'].append(f"Failed to create lecturer {lecturer_raw}: {str(e)}")
-                        db.rollback()
-                        continue
-                else:
-                    existing_id = existing['id']
-                    results['lecturers_skipped'] += 1
-            else:
-                results['errors'].append(f"Could not parse lecturer name: {lecturer_raw}")
+    try:
+        for row in rows:
+            code = row.get(col_map.get('code', ''), '').strip()
+            if not code:
                 continue
-        else:
-            existing_id = None
+            name = row.get(col_map.get('name', ''), '').strip()
+            if not name:
+                name = code
+            lecturer_raw = row.get(col_map.get('lecturer', ''), '').strip()
+            group = row.get(col_map.get('group', ''), '').strip()
+            if not group:
+                group = '1.1'
+            dur_raw = row.get(col_map.get('duration', ''), '').strip()
+            try:
+                duration = float(dur_raw) if dur_raw else 4.0
+            except ValueError:
+                duration = 4.0
+            stu_raw = row.get(col_map.get('max_students', ''), '').strip()
+            try:
+                max_students = int(stu_raw) if stu_raw else 50
+            except ValueError:
+                max_students = 50
 
-        existing_course = db.execute("SELECT id FROM courses WHERE code=? AND group_name=?", (code, group)).fetchone()
-        if existing_course:
-            results['courses_skipped'] += 1
-            continue
+            if lecturer_raw and lecturer_raw.upper() not in ('TBA', 'TBC', 'N/A', ''):
+                _, _, lec_username, lec_email = _parse_lecturer_name(lecturer_raw)
+                if lec_username:
+                    existing = db.execute("SELECT id FROM users WHERE username=? AND role='lecturer'", (lec_username,)).fetchone()
+                    if not existing:
+                        try:
+                            db.execute("INSERT INTO users (username, password, role, full_name, email) VALUES (?,?,?,?,?)",
+                                       (lec_username, '1234', 'lecturer', lecturer_raw.strip(), lec_email))
+                            db.commit()
+                            results['lecturers_created'] += 1
+                            existing_id = db.execute("SELECT id FROM users WHERE username=? AND role='lecturer'", (lec_username,)).fetchone()['id']
+                        except Exception as e:
+                            results['errors'].append(f"Failed to create lecturer {lecturer_raw}: {str(e)}")
+                            db.rollback()
+                            continue
+                    else:
+                        existing_id = existing['id']
+                        results['lecturers_skipped'] += 1
+                else:
+                    results['errors'].append(f"Could not parse lecturer name: {lecturer_raw}")
+                    continue
+            else:
+                existing_id = None
 
-        try:
-            db.execute("""INSERT INTO courses (name, code, level, lecturer_id, group_name, duration_hours, color, max_students)
-                          VALUES (?,?,?,?,?,?,?,?)""",
-                       (name, code, 'department', existing_id or 1, group, duration, '#4A90D9', max_students))
-            db.commit()
-            results['courses_created'] += 1
-        except Exception as e:
-            results['errors'].append(f"Failed to create course {name} ({code}): {str(e)}")
-            db.rollback()
+            existing_course = db.execute("SELECT id FROM courses WHERE code=? AND group_name=?", (code, group)).fetchone()
+            if existing_course:
+                results['courses_skipped'] += 1
+                continue
 
-    db.close()
+            try:
+                db.execute("""INSERT INTO courses (name, code, level, lecturer_id, group_name, duration_hours, color, max_students)
+                              VALUES (?,?,?,?,?,?,?,?)""",
+                           (name, code, 'department', existing_id or 1, group, duration, '#4A90D9', max_students))
+                db.commit()
+                results['courses_created'] += 1
+            except Exception as e:
+                results['errors'].append(f"Failed to create course {name} ({code}): {str(e)}")
+                db.rollback()
 
-    log_activity(session['user_id'], 'upload_documents',
-                 f'Uploaded {file.filename}: {results["courses_created"]} courses created, {results["lecturers_created"]} lecturers created, {results["courses_skipped"]} skipped')
+        db.close()
+
+        log_activity(session['user_id'], 'upload_documents',
+                     f'Uploaded {filename}: {results["courses_created"]} courses created, {results["lecturers_created"]} lecturers created, {results["courses_skipped"]} skipped')
+    except Exception as e:
+        db.close()
+        flash(f'Import failed: {str(e)}', 'error')
+        return redirect(url_for('admin_upload_documents'))
+
     return render_template('admin_upload.html', results=results)
 
 # ─── Lecturer Routes ───────────────────────────────────────────────
