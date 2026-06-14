@@ -18,6 +18,8 @@ from notifications import (create_notification, get_unread_count, get_notificati
                            mark_notification_read, mark_all_read, log_activity,
                            get_activity_logs, notify_timetable_change)
 
+from document_parser import DocumentParser
+
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'timetable-secret-key-2026')
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024
@@ -647,96 +649,151 @@ def admin_upload_documents():
     if request.form.get('confirm_import') == '1':
         rows = session.pop('upload_rows', [])
         col_map = session.pop('upload_col_map', {})
+        filename = session.pop('upload_filename', 'preview')
         if not rows:
             flash('Session expired. Please re-upload.', 'error')
             return redirect(url_for('admin_upload_documents'))
-        # Skip to import logic below
-    else:
-        # Normal file upload flow
-        if 'file' not in request.files:
-            flash('No file uploaded.', 'error')
-            return redirect(url_for('admin_upload_documents'))
+        # Parse using the document parser
+        parser = DocumentParser()
+        parsed_data = parser.parse_all_formats('dummy_file_for_import')
+        # Use the parsed data to create courses and lecturers
+        result = admin_process_parsed_data(parsed_data, filename)
+        return result
 
-        file = request.files['file']
-        if not file.filename:
-            flash('No file selected.', 'error')
-            return redirect(url_for('admin_upload_documents'))
-
-        ext = os.path.splitext(file.filename)[1].lower()
-        if ext not in ('.xlsx', '.xls', '.csv'):
-            flash('Please upload an Excel (.xlsx, .xls) or CSV (.csv) file.', 'error')
-            return redirect(url_for('admin_upload_documents'))
-
-        import csv, io, re, tempfile
-        from openpyxl import load_workbook
-
-        rows = []
-        if ext == '.csv':
-            content = file.read().decode('utf-8-sig')
-            reader = csv.DictReader(io.StringIO(content))
-            rows = [row for row in reader]
-        else:
-            tmp = tempfile.NamedTemporaryFile(delete=False, suffix=ext)
-            file.save(tmp.name)
-            tmp.close()
-            wb = load_workbook(tmp.name, read_only=True, data_only=True)
-            ws = wb.active
-            
-            # Read first 5 rows to find the best header row
-            raw_rows = []
-            for row in ws.iter_rows(min_row=1, max_row=min(5, ws.max_row), values_only=True):
-                raw_rows.append([str(c).strip() if c is not None else '' for c in row])
-            
-            # Find header row by scoring against known column keywords
-            known_keywords = ['code', 'name', 'course', 'lecturer', 'instructor', 'teacher', 'part', 'level', 'group', 'duration', 'hours', 'student', 'capacity', 'subject', 'module']
-            best_row_idx = 0
-            best_score = -1
-            for idx, row in enumerate(raw_rows):
-                score = sum(1 for cell in row for kw in known_keywords if kw in cell.lower())
-                if score > best_score:
-                    best_score = score
-                    best_row_idx = idx
-        
-        headers = [h.lower() if h else '' for h in raw_rows[best_row_idx]]
-        data_rows = raw_rows[best_row_idx + 1:]
-        
-        for row_vals in data_rows:
-            if not any(v for v in row_vals):
-                continue
-            rows.append({headers[i]: row_vals[i] if i < len(row_vals) else '' for i in range(len(headers))})
-        wb.close()
-        os.unlink(tmp.name)
-
-    if not rows:
-        flash('No data found in the file.', 'warning')
+    # Normal file upload flow
+    if 'file' not in request.files:
+        flash('No file uploaded.', 'error')
         return redirect(url_for('admin_upload_documents'))
 
-    # Build column map FIRST (used by both preview and confirm)
-    col_map = {}
-    for h in rows[0]:
-        hl = h.lower().strip().replace('_', ' ').replace('-', ' ')
-        if any(k in hl for k in ['course code', 'course_code', 'subject code', 'module code', 'code']):
-            col_map['code'] = h
-        elif any(k in hl for k in ['course name', 'course_name', 'subject name', 'module name', 'course title', 'subject', 'module', 'name']):
-            col_map['name'] = h
-        elif any(k in hl for k in ['lecturer', 'instructor', 'teacher', 'staff', 'facilitator']):
-            col_map['lecturer'] = h
-        elif any(k in hl for k in ['part', 'level', 'group', 'year', 'semester', 'class', 'section']):
-            col_map['group'] = h
-        elif any(k in hl for k in ['duration', 'hours', 'hrs', 'credit', 'credits', 'contact hours']):
-            col_map['duration'] = h
-        elif any(k in hl for k in ['max students', 'students', 'capacity', 'max', 'enrollment', 'class size', 'number of students']):
-            col_map['max_students'] = h
+    file = request.files['file']
+    if not file.filename:
+        flash('No file selected.', 'error')
+        return redirect(url_for('admin_upload_documents'))
 
-    print(f"[UPLOAD] Headers: {list(rows[0].keys())}")
-    print(f"[UPLOAD] Col map: {col_map}")
+    ext = os.path.splitext(file.filename)[1].lower()
+    if ext not in ('.xlsx', '.xls', '.csv', '.docx', '.pptx'):
+        flash('Please upload an Excel (.xlsx, .xls), Word (.docx), PowerPoint (.pptx) or CSV (.csv) file.', 'error')
+        return redirect(url_for('admin_upload_documents'))
 
-    if request.form.get('preview') == '1':
-        # Preview mode - show first 5 rows for confirmation
-        session['upload_rows'] = rows
-        session['upload_col_map'] = col_map
-        session['upload_filename'] = file.filename
-        return render_template('admin_upload.html', preview=True, headers=list(rows[0].keys()), sample_rows=rows[:5])
+    # Save file temporarily
+    import tempfile
+    tmp = tempfile.NamedTemporaryFile(delete=False, suffix=ext)
+    file.save(tmp.name)
+    tmp.close()
+
+    # Parse using the document parser
+    parser = DocumentParser()
+    parsed_data = parser.parse_all_formats(tmp.name)
+    
+    # Clean up temp file
+    import os
+    os.unlink(tmp.name)
+
+    if parsed_data.get('errors') or (not parsed_data.get('courses') and not parsed_data.get('lecturers') and not parsed_data.get('rooms')):
+        flash(f'No parsable data found: {parsed_data.get("notes", "")}', 'warning')
+        return redirect(url_for('admin_upload_documents'))
+
+    # Store parsed data in session for preview
+    session['upload_parsed_data'] = parsed_data
+    session['upload_filename'] = file.filename
+
+    return render_template('admin_upload.html', preview=True, 
+                           courses=parsed_data.get('courses', []),
+                           lecturers=parsed_data.get('lecturers', []),
+                           rooms=parsed_data.get('rooms', []),
+                           filename=file.filename)
+
+
+def admin_process_parsed_data(parsed_data: Dict, filename: str) -> Any:
+    """Process parsed data and create courses/lecturers in the database."""
+    from models import get_db
+    import re
+
+    db = get_db()
+    results = {'lecturers_created': 0, 'lecturers_skipped': 0, 'courses_created': 0, 'courses_skipped': 0, 'errors': []}
+
+    try:
+        # Process lecturers first
+        for lecturer in parsed_data.get('lecturers', []):
+            username = lecturer.get('username', '')
+            if not username:
+                continue
+
+            existing = db.execute("SELECT id FROM users WHERE username=? AND role='lecturer'", (username,)).fetchone()
+
+            if not existing:
+                try:
+                    email = lecturer.get('email', '')
+                    full_name = lecturer.get('full_name', '')
+                    title = lecturer.get('title')
+
+                    if title and title not in full_name:
+                        full_name = f"{title} {full_name}"
+
+                    db.execute("INSERT INTO users (username, password, role, full_name, email) VALUES (?,?,?,?,?)",
+                               (username, '1234', 'lecturer', full_name, email))
+                    db.commit()
+
+                    lecturer_id = db.execute("SELECT id FROM users WHERE username=? AND role='lecturer'", (username,)).fetchone()['id']
+
+                    results['lecturers_created'] += 1
+
+                    lecturer_note = f"Uploaded from {filename}"
+                    if lecturer.get('notes'):
+                        lecturer_note += f": {lecturer['notes']}"
+
+                    log_activity(session['user_id'], 'upload_lecturer', lecturer_note)
+
+                except Exception as e:
+                    results['errors'].append(f"Failed to create lecturer {username}: {str(e)}")
+                    db.rollback()
+                    continue
+            else:
+                lecturer_id = existing['id']
+                results['lecturers_skipped'] += 1
+
+            # Process courses for this lecturer
+            for course in parsed_data.get('courses', []):
+                if course.get('lecturer_username') == username:
+                    course_code = course.get('course_code', '')
+                    course_name = course.get('course_name', course_code)
+                    group = course.get('group', '1.1')
+                    duration = course.get('duration_hours', 4)
+                    department = course.get('department', '')
+                    color = course.get('color', '#4A90D9')
+                    max_students = course.get('max_students', 50)
+                    notes = course.get('notes', '')
+
+                    existing_course = db.execute("SELECT id FROM courses WHERE code=? AND group_name=?", (course_code, group)).fetchone()
+
+                    if existing_course:
+                        results['courses_skipped'] += 1
+                        continue
+
+                    try:
+                        db.execute("INSERT INTO courses (name, code, level, lecturer_id, group_name, duration_hours, department_id, color, max_students) VALUES (?,?,?,?,?,?,?,?,?)",
+                                   (course_name, course_code, 'department', lecturer_id, group, duration, None, color, max_students))
+                        db.commit()
+
+                        results['courses_created'] += 1
+
+                        course_note = f"Uploaded from {filename}"
+                        if notes:
+                            course_note += f": {notes}"
+
+                        log_activity(session['user_id'], 'upload_course', course_note)
+
+                    except Exception as e:
+                        results['errors'].append(f"Failed to create course {course_code}: {str(e)}")
+                        db.rollback()
+                        continue
+
+        return render_template('admin_upload.html', results=results, filename=filename)
+
+    except Exception as e:
+        db.close()
+        flash(f'Import failed: {str(e)}', 'error')
+        return redirect(url_for('admin_upload_documents'))
 
     def _parse_lecturer_name(raw):
         raw = raw.strip()
