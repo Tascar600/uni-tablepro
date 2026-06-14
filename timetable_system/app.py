@@ -643,49 +643,59 @@ def admin_upload_documents():
     if request.method == 'GET':
         return render_template('admin_upload.html')
 
-    if 'file' not in request.files:
-        flash('No file uploaded.', 'error')
-        return redirect(url_for('admin_upload_documents'))
-
-    file = request.files['file']
-    if not file.filename:
-        flash('No file selected.', 'error')
-        return redirect(url_for('admin_upload_documents'))
-
-    ext = os.path.splitext(file.filename)[1].lower()
-    if ext not in ('.xlsx', '.xls', '.csv'):
-        flash('Please upload an Excel (.xlsx, .xls) or CSV (.csv) file.', 'error')
-        return redirect(url_for('admin_upload_documents'))
-
-    import csv, io, re, tempfile
-    from openpyxl import load_workbook
-
-    rows = []
-    if ext == '.csv':
-        content = file.read().decode('utf-8-sig')
-        reader = csv.DictReader(io.StringIO(content))
-        rows = [row for row in reader]
+    # Handle confirm import from preview (no file in this request)
+    if request.form.get('confirm_import') == '1':
+        rows = session.pop('upload_rows', [])
+        col_map = session.pop('upload_col_map', {})
+        if not rows:
+            flash('Session expired. Please re-upload.', 'error')
+            return redirect(url_for('admin_upload_documents'))
+        # Skip to import logic below
     else:
-        tmp = tempfile.NamedTemporaryFile(delete=False, suffix=ext)
-        file.save(tmp.name)
-        tmp.close()
-        wb = load_workbook(tmp.name, read_only=True, data_only=True)
-        ws = wb.active
-        
-        # Read first 5 rows to find the best header row
-        raw_rows = []
-        for row in ws.iter_rows(min_row=1, max_row=min(5, ws.max_row), values_only=True):
-            raw_rows.append([str(c).strip() if c is not None else '' for c in row])
-        
-        # Find header row by scoring against known column keywords
-        known_keywords = ['code', 'name', 'course', 'lecturer', 'instructor', 'teacher', 'part', 'level', 'group', 'duration', 'hours', 'student', 'capacity', 'subject', 'module']
-        best_row_idx = 0
-        best_score = -1
-        for idx, row in enumerate(raw_rows):
-            score = sum(1 for cell in row for kw in known_keywords if kw in cell.lower())
-            if score > best_score:
-                best_score = score
-                best_row_idx = idx
+        # Normal file upload flow
+        if 'file' not in request.files:
+            flash('No file uploaded.', 'error')
+            return redirect(url_for('admin_upload_documents'))
+
+        file = request.files['file']
+        if not file.filename:
+            flash('No file selected.', 'error')
+            return redirect(url_for('admin_upload_documents'))
+
+        ext = os.path.splitext(file.filename)[1].lower()
+        if ext not in ('.xlsx', '.xls', '.csv'):
+            flash('Please upload an Excel (.xlsx, .xls) or CSV (.csv) file.', 'error')
+            return redirect(url_for('admin_upload_documents'))
+
+        import csv, io, re, tempfile
+        from openpyxl import load_workbook
+
+        rows = []
+        if ext == '.csv':
+            content = file.read().decode('utf-8-sig')
+            reader = csv.DictReader(io.StringIO(content))
+            rows = [row for row in reader]
+        else:
+            tmp = tempfile.NamedTemporaryFile(delete=False, suffix=ext)
+            file.save(tmp.name)
+            tmp.close()
+            wb = load_workbook(tmp.name, read_only=True, data_only=True)
+            ws = wb.active
+            
+            # Read first 5 rows to find the best header row
+            raw_rows = []
+            for row in ws.iter_rows(min_row=1, max_row=min(5, ws.max_row), values_only=True):
+                raw_rows.append([str(c).strip() if c is not None else '' for c in row])
+            
+            # Find header row by scoring against known column keywords
+            known_keywords = ['code', 'name', 'course', 'lecturer', 'instructor', 'teacher', 'part', 'level', 'group', 'duration', 'hours', 'student', 'capacity', 'subject', 'module']
+            best_row_idx = 0
+            best_score = -1
+            for idx, row in enumerate(raw_rows):
+                score = sum(1 for cell in row for kw in known_keywords if kw in cell.lower())
+                if score > best_score:
+                    best_score = score
+                    best_row_idx = idx
         
         headers = [h.lower() if h else '' for h in raw_rows[best_row_idx]]
         data_rows = raw_rows[best_row_idx + 1:]
@@ -721,14 +731,7 @@ def admin_upload_documents():
     print(f"[UPLOAD] Headers: {list(rows[0].keys())}")
     print(f"[UPLOAD] Col map: {col_map}")
 
-    # Confirm import from preview
-    if request.form.get('confirm_import') == '1':
-        rows = session.pop('upload_rows', [])
-        col_map = session.pop('upload_col_map', col_map)  # fallback to current
-        if not rows:
-            flash('Session expired. Please re-upload.', 'error')
-            return redirect(url_for('admin_upload_documents'))
-    elif request.form.get('preview') == '1':
+    if request.form.get('preview') == '1':
         # Preview mode - show first 5 rows for confirmation
         session['upload_rows'] = rows
         session['upload_col_map'] = col_map
