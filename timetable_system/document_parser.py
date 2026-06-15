@@ -39,7 +39,8 @@ class DocumentParser:
         self.code_headers = ['code', 'course code', 'courseid', 'cid', 'subject code', 'module code']
         self.name_headers = ['course name', 'name', 'title', 'subject', 'course', 'course title', 'subject name']
         self.lecturer_headers = ['lecturer', 'lecturer name', 'lecturer_name', 'staff', 'instructor', 'tutor', 'teacher', 'facilitator']
-        self.group_headers = ['group', 'part', 'level', 'year', 'semester', 'section', 'class', 'part/level', 'level/part']
+        self.group_headers = ['group', 'part', 'year', 'semester', 'section', 'class', 'part/level', 'level/part']
+        self.level_headers = ['level', 'course level', 'course_level', 'year level']
         self.duration_headers = ['duration', 'hours', 'lecture hours', 'credit', 'credits', 'hrs', 'duration hours']
         self.students_headers = ['max students', 'students', 'enrollment', 'capacity', 'max', 'class size', 'number of students']
         self.department_headers = ['department', 'dept', 'faculty', 'school', 'division']
@@ -241,6 +242,8 @@ class DocumentParser:
                 col_map['lecturer'] = idx
             elif any(k in header_norm for k in self.group_headers):
                 col_map['group'] = idx
+            elif any(k in header_norm for k in self.level_headers):
+                col_map['level'] = idx
             elif any(k in header_norm for k in self.duration_headers):
                 col_map['duration'] = idx
             elif any(k in header_norm for k in self.students_headers):
@@ -296,6 +299,16 @@ class DocumentParser:
 
         department = row_values[col_map.get('department', -1)] if 'department' in col_map and col_map['department'] < len(row_values) else ''
 
+        level = row_values[col_map.get('level', -1)] if 'level' in col_map and col_map['level'] < len(row_values) else ''
+        # Normalize level to valid values
+        valid_levels = ['university', 'department', 'single']
+        if level:
+            level_lower = level.lower().strip()
+            if level_lower in valid_levels:
+                level = level_lower
+            else:
+                level = ''
+
         room = row_values[col_map.get('room', -1)] if 'room' in col_map and col_map['room'] < len(row_values) else ''
         if room:
             room_data = self._create_room_data(room, sheet_name, row_idx)
@@ -344,7 +357,7 @@ class DocumentParser:
             'course_code': code,
             'course_name': self.normalize_name(name) if name else code,
             'duration_hours': duration,
-            'level': '',
+            'level': level,
             'department': self.normalize_name(department) if department else '',
             'color': 'blue',
             'max_students': students,
@@ -478,6 +491,15 @@ class DocumentParser:
         except (ValueError, TypeError):
             students = 50
 
+        level = row_values[col_map.get('level', -1)] if 'level' in col_map and col_map['level'] < len(row_values) else ''
+        valid_levels = ['university', 'department', 'single']
+        if level:
+            level_lower = level.lower().strip()
+            if level_lower in valid_levels:
+                level = level_lower
+            else:
+                level = ''
+
         lecturer_username = ''
         lecturer_email = ''
         lecturer_note = ''
@@ -520,13 +542,13 @@ class DocumentParser:
             'course_code': code,
             'course_name': self.normalize_name(name) if name else code,
             'duration_hours': duration,
-            'level': '',
+            'level': level,
             'department': '',
             'color': 'blue',
             'max_students': students,
             'group': group,
             'lecturer_username': lecturer_username if lecturer_username else None,
-            'lecturer_email': lecturer_email if lecturer_email else None,
+            'lecturer_email': lecturer_email if lecturer_username else None,
             'notes': '; '.join(notes) if notes else None,
             'source_location': source_loc,
             'flag': 'needs_lecturer' if lecturer_text and lecturer_text.upper() in ['TBA', 'TBC', 'N/A', ''] else None
