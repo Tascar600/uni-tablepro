@@ -250,6 +250,9 @@ class DocumentParser:
             elif any(k in header_norm for k in self.room_headers):
                 col_map['room'] = idx
 
+        # Debug logging
+        print(f"[PARSER DEBUG] Headers: {headers}")
+        print(f"[PARSER DEBUG] Column map: {col_map}")
         return col_map
 
     def _process_excel_row(self, row_values: List[str], col_map: Dict[str, int], sheet_name: str, row_idx: int) -> Optional[Dict]:
@@ -257,8 +260,12 @@ class DocumentParser:
         if not row_values:
             return None
 
+        print(f"[PARSER DEBUG] Row {row_idx}: {row_values}")
+        print(f"[PARSER DEBUG] Col map: {col_map}")
+
         code = row_values[col_map.get('code', -1)] if 'code' in col_map and col_map['code'] < len(row_values) else ''
         if not code:
+            print(f"[PARSER DEBUG] No code found, skipping row")
             return None
 
         code = self.normalize_text(code)

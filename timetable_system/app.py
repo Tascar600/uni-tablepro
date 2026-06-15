@@ -681,6 +681,14 @@ def admin_upload_documents():
         # Parse using the document parser
         parser = DocumentParser()
         parsed_data = parser.parse_all_formats(tmp.name)
+        # Debug logging
+        print(f"[UPLOAD DEBUG] Parsed data keys: {parsed_data.keys()}")
+        print(f"[UPLOAD DEBUG] Courses: {len(parsed_data.get('courses', []))}")
+        print(f"[UPLOAD DEBUG] Lecturers: {len(parsed_data.get('lecturers', []))}")
+        print(f"[UPLOAD DEBUG] Rooms: {len(parsed_data.get('rooms', []))}")
+        print(f"[UPLOAD DEBUG] Notes: {parsed_data.get('notes', 'N/A')}")
+        if parsed_data.get('courses'):
+            print(f"[UPLOAD DEBUG] First course: {parsed_data['courses'][0]}")
     except Exception as e:
         import os
         os.unlink(tmp.name)
