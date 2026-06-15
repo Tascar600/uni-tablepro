@@ -5,6 +5,7 @@ import sqlite3
 import uuid
 from datetime import datetime, timedelta
 from functools import wraps
+from typing import Dict, Any, List
 
 from flask import (Flask, render_template, request, redirect, session,
                    url_for, jsonify, flash, send_file, Response, abort)
@@ -751,14 +752,24 @@ def admin_upload_documents():
         return redirect(url_for('admin_upload_documents'))
 
     # Store parsed data in session for preview
-    session['upload_parsed_data'] = parsed_data
-    session['upload_filename'] = file.filename
+    try:
+        session['upload_parsed_data'] = parsed_data
+        session['upload_filename'] = file.filename
+    except Exception as e:
+        print(f"[UPLOAD ERROR] Session storage failed: {e}")
+        flash('Failed to store parsed data. Please try again.', 'error')
+        return redirect(url_for('admin_upload_documents'))
 
-    return render_template('admin_upload.html', preview=True, 
-                           courses=parsed_data.get('courses', []),
-                           lecturers=parsed_data.get('lecturers', []),
-                           rooms=parsed_data.get('rooms', []),
-                           filename=file.filename)
+    try:
+        return render_template('admin_upload.html', preview=True, 
+                               courses=parsed_data.get('courses', []),
+                               lecturers=parsed_data.get('lecturers', []),
+                               rooms=parsed_data.get('rooms', []),
+                               filename=file.filename)
+    except Exception as e:
+        print(f"[UPLOAD ERROR] Template render failed: {e}")
+        flash(f'Preview failed: {str(e)}', 'error')
+        return redirect(url_for('admin_upload_documents'))
 
 
 def admin_process_parsed_data(parsed_data: Dict, filename: str) -> Any:
@@ -770,6 +781,11 @@ def admin_process_parsed_data(parsed_data: Dict, filename: str) -> Any:
     results = {'lecturers_created': 0, 'lecturers_skipped': 0, 'courses_created': 0, 'courses_skipped': 0, 'errors': []}
 
     try:
+        user_id = session.get('user_id')
+        if not user_id:
+            flash('Session expired. Please log in again.', 'error')
+            return redirect(url_for('login'))
+
         # Process lecturers first
         for lecturer in parsed_data.get('lecturers', []):
             username = lecturer.get('username', '')
@@ -799,7 +815,7 @@ def admin_process_parsed_data(parsed_data: Dict, filename: str) -> Any:
                     if lecturer.get('notes'):
                         lecturer_note += f": {lecturer['notes']}"
 
-                    log_activity(session['user_id'], 'upload_lecturer', lecturer_note)
+                    log_activity(user_id, 'upload_lecturer', lecturer_note)
 
                 except Exception as e:
                     results['errors'].append(f"Failed to create lecturer {username}: {str(e)}")
@@ -829,7 +845,7 @@ def admin_process_parsed_data(parsed_data: Dict, filename: str) -> Any:
 
                     try:
                         db.execute("INSERT INTO courses (name, code, level, lecturer_id, group_name, duration_hours, department_id, color, max_students) VALUES (?,?,?,?,?,?,?,?,?)",
-                                   (course_name, course_code, 'department', lecturer_id, group, duration, None, color, max_students))
+                                   (course_name, course_code, course.get('level', ''), lecturer_id, group, duration, None, color, max_students))
                         db.commit()
 
                         results['courses_created'] += 1
@@ -838,7 +854,7 @@ def admin_process_parsed_data(parsed_data: Dict, filename: str) -> Any:
                         if notes:
                             course_note += f": {notes}"
 
-                        log_activity(session['user_id'], 'upload_course', course_note)
+                        log_activity(user_id, 'upload_course', course_note)
 
                     except Exception as e:
                         results['errors'].append(f"Failed to create course {course_code}: {str(e)}")
