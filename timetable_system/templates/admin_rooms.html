@@ -73,41 +73,48 @@
 <div class="card">
     <div class="card-header"><h3>All Rooms</h3></div>
     {% if rooms %}
-    <div class="table-wrapper">
-        <table>
-            <thead>
-                <tr>
-                    <th>Name</th>
-                    <th>Building</th>
-                    <th>Floor</th>
-                    <th>Type</th>
-                    <th>Capacity</th>
-                    <th>Projector</th>
-                    <th>Computers</th>
-                    <th>Action</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for r in rooms %}
-                <tr>
-                    <td><strong>{{ r.name }}</strong></td>
-                    <td>{{ r.building }}</td>
-                    <td>{{ r.floor }}</td>
-                    <td><span class="badge badge-info">{{ r.room_type|replace('_',' ')|title }}</span></td>
-                    <td>{{ r.capacity }}</td>
-                    <td>{{ '&#10003;'|safe if r.has_projector else '&#10007;'|safe }}</td>
-                    <td>{{ '&#10003;'|safe if r.has_computers else '&#10007;'|safe }}</td>
-                    <td>
-                        <button class="btn btn-sm btn-primary" onclick="openEditRoom({{ r.id }})">Edit</button>
-                        <form method="POST" action="/admin/rooms/delete/{{ r.id }}" style="display:inline">
-                            <button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('Delete {{ r.name }}?')">Delete</button>
-                        </form>
-                    </td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-    </div>
+    <form method="POST" action="/admin/rooms/delete-bulk" id="bulkDeleteForm" onsubmit="return confirm('Delete selected rooms? This cannot be undone.')">
+        <div class="btn-group mb-2">
+            <button type="submit" class="btn btn-danger" id="bulkDeleteBtn" disabled>&#128465; Delete Selected (0)</button>
+        </div>
+        <div class="table-wrapper">
+            <table>
+                <thead>
+                    <tr>
+                        <th style="width:40px"><input type="checkbox" id="selectAllRooms" onchange="toggleSelectAll()"></th>
+                        <th>Name</th>
+                        <th>Building</th>
+                        <th>Floor</th>
+                        <th>Type</th>
+                        <th>Capacity</th>
+                        <th>Projector</th>
+                        <th>Computers</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for r in rooms %}
+                    <tr>
+                        <td><input type="checkbox" name="room_ids" value="{{ r.id }}" class="room-checkbox" onchange="updateBulkDeleteBtn()"></td>
+                        <td><strong>{{ r.name }}</strong></td>
+                        <td>{{ r.building }}</td>
+                        <td>{{ r.floor }}</td>
+                        <td><span class="badge badge-info">{{ r.room_type|replace('_',' ')|title }}</span></td>
+                        <td>{{ r.capacity }}</td>
+                        <td>{{ '&#10003;'|safe if r.has_projector else '&#10007;'|safe }}</td>
+                        <td>{{ '&#10003;'|safe if r.has_computers else '&#10007;'|safe }}</td>
+                        <td>
+                            <button class="btn btn-sm btn-primary" onclick="openEditRoom({{ r.id }})">Edit</button>
+                            <form method="POST" action="/admin/rooms/delete/{{ r.id }}" style="display:inline">
+                                <button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('Delete {{ r.name }}?')">Delete</button>
+                            </form>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </form>
     {% else %}
     <div class="empty-state">
         <div class="empty-icon">&#8962;</div>
@@ -184,6 +191,23 @@ function openEditRoom(id) {
     document.getElementById('edit-room-computers').checked = r.has_computers == 1;
     document.getElementById('editRoomForm').action = '/admin/edit-room/' + id;
     openModal('editRoomModal');
+}
+
+function toggleSelectAll() {
+    var selectAll = document.getElementById('selectAllRooms');
+    var checkboxes = document.querySelectorAll('.room-checkbox');
+    checkboxes.forEach(function(cb) {
+        cb.checked = selectAll.checked;
+    });
+    updateBulkDeleteBtn();
+}
+
+function updateBulkDeleteBtn() {
+    var checkboxes = document.querySelectorAll('.room-checkbox:checked');
+    var btn = document.getElementById('bulkDeleteBtn');
+    var count = checkboxes.length;
+    btn.disabled = count === 0;
+    btn.innerHTML = count > 0 ? '&#128465; Delete Selected (' + count + ')' : '&#128465; Delete Selected (0)';
 }
 </script>
 {% endblock %}

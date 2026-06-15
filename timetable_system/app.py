@@ -376,6 +376,30 @@ def admin_delete_room(room_id):
     return redirect(url_for('admin_rooms'))
 
 
+@app.route('/admin/rooms/delete-bulk', methods=['POST'])
+@login_required
+@role_required('admin')
+def admin_delete_rooms_bulk():
+    room_ids = request.form.getlist('room_ids')
+    if not room_ids:
+        flash('No rooms selected.', 'warning')
+        return redirect(url_for('admin_rooms'))
+    
+    db = get_db()
+    deleted_count = 0
+    for room_id in room_ids:
+        try:
+            db.execute("DELETE FROM rooms WHERE id=?", (room_id,))
+            deleted_count += 1
+        except Exception as e:
+            pass
+    db.commit()
+    log_activity(session['user_id'], 'delete_rooms_bulk', f'Deleted {deleted_count} rooms', 'room')
+    flash(f'{deleted_count} room(s) deleted.', 'success')
+    db.close()
+    return redirect(url_for('admin_rooms'))
+
+
 @app.route('/admin/edit-room/<int:room_id>', methods=['POST'])
 @login_required
 @role_required('admin')
