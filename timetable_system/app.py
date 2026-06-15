@@ -463,6 +463,50 @@ def admin_delete_course(course_id):
     return redirect(url_for('admin_courses'))
 
 
+@app.route('/admin/delete-courses-bulk', methods=['POST'])
+@login_required
+@role_required('admin')
+def admin_delete_courses_bulk():
+    course_ids = request.form.getlist('course_ids')
+    if not course_ids:
+        flash('No courses selected.', 'warning')
+        return redirect(url_for('admin_courses'))
+    
+    db = get_db()
+    deleted = 0
+    for cid in course_ids:
+        course = db.execute("SELECT * FROM courses WHERE id=?", (cid,)).fetchone()
+        if course:
+            db.execute("DELETE FROM student_enrollments WHERE course_id=?", (cid,))
+            db.execute("DELETE FROM timetable_entries WHERE course_id=?", (cid,))
+            db.execute("DELETE FROM courses WHERE id=?", (cid,))
+            deleted += 1
+            log_activity(session['user_id'], 'delete_course', f'Deleted course: {course["name"]}', 'course', cid)
+    db.commit()
+    db.close()
+    flash(f'{deleted} course(s) deleted.', 'success')
+    return redirect(url_for('admin_courses'))
+
+
+@app.route('/admin/delete-all-timetable', methods=['POST'])
+@login_required
+@role_required('admin')
+def admin_delete_all_timetable():
+    db = get_db()
+    # Delete all courses and related data, but keep lecturers
+    courses = db.execute("SELECT * FROM courses").fetchall()
+    for course in courses:
+        db.execute("DELETE FROM student_enrollments WHERE course_id=?", (course['id'],))
+        db.execute("DELETE FROM timetable_entries WHERE course_id=?", (course['id'],))
+        log_activity(session['user_id'], 'delete_course', f'Deleted course: {course["name"]}', 'course', course['id'])
+    db.execute("DELETE FROM courses")
+    db.execute("DELETE FROM timetable_entries")
+    db.commit()
+    db.close()
+    flash('All courses and timetable entries deleted. Lecturers preserved.', 'success')
+    return redirect(url_for('admin_courses'))
+
+
 @app.route('/admin/edit-course/<int:course_id>', methods=['POST'])
 @login_required
 @role_required('admin')

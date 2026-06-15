@@ -85,43 +85,53 @@
 </div>
 
 <div class="card">
-    <div class="card-header"><h3>All Courses</h3></div>
-    {% if courses %}
-    <div class="table-wrapper">
-        <table>
-            <thead>
-                <tr>
-                    <th>Name</th>
-                    <th>Code</th>
-                    <th>Level</th>
-                    <th>Lecturer</th>
-                    <th>Group</th>
-                    <th>Duration</th>
-                    <th>Department</th>
-                    <th>Action</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for c in courses %}
-                <tr>
-                    <td><span class="flex-center gap-1"><span class="legend-color" style="background:{{ c.color or '#4A90D9' }}"></span>{{ c.name }}</span></td>
-                    <td><code>{{ c.code }}</code></td>
-                    <td><span class="badge badge-{{ c.level }}">{{ c.level }}</span></td>
-                    <td>{{ c.lecturer_name }}</td>
-                    <td>{{ c.group_name }}</td>
-                    <td>{{ c.duration_hours }}h</td>
-                    <td>{{ c.department_name or '-' }}</td>
-                    <td>
-                        <button class="btn btn-sm btn-primary" onclick="openEditCourse({{ c.id }})">Edit</button>
-                        <form method="POST" action="/admin/delete-course/{{ c.id }}" style="display:inline">
-                            <button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('Delete {{ c.name }}?')">Delete</button>
-                        </form>
-                    </td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
+    <div class="card-header">
+        <h3>All Courses</h3>
+        <div class="btn-group" style="margin-top:-0.5rem">
+            <button type="button" class="btn btn-sm btn-danger" onclick="deleteSelectedCourses()" id="deleteSelectedBtn" disabled>&#128465; Delete Selected</button>
+            <button type="button" class="btn btn-sm btn-danger" onclick="confirmDeleteAllTimetable()">&#128465; Delete All Timetable (Keep Lecturers)</button>
+        </div>
     </div>
+    {% if courses %}
+    <form id="courseTableForm" method="POST">
+        <div class="table-wrapper">
+            <table>
+                <thead>
+                    <tr>
+                        <th><input type="checkbox" id="selectAllCourses" onchange="toggleSelectAll(this)"></th>
+                        <th>Name</th>
+                        <th>Code</th>
+                        <th>Level</th>
+                        <th>Lecturer</th>
+                        <th>Group</th>
+                        <th>Duration</th>
+                        <th>Department</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for c in courses %}
+                    <tr>
+                        <td><input type="checkbox" name="course_ids" value="{{ c.id }}" class="course-checkbox" onchange="updateDeleteButton()"></td>
+                        <td><span class="flex-center gap-1"><span class="legend-color" style="background:{{ c.color or '#4A90D9' }}"></span>{{ c.name }}</span></td>
+                        <td><code>{{ c.code }}</code></td>
+                        <td><span class="badge badge-{{ c.level }}">{{ c.level }}</span></td>
+                        <td>{{ c.lecturer_name }}</td>
+                        <td>{{ c.group_name }}</td>
+                        <td>{{ c.duration_hours }}h</td>
+                        <td>{{ c.department_name or '-' }}</td>
+                        <td>
+                            <button class="btn btn-sm btn-primary" onclick="openEditCourse({{ c.id }})">Edit</button>
+                            <form method="POST" action="/admin/delete-course/{{ c.id }}" style="display:inline">
+                                <button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('Delete {{ c.name }}?')">Delete</button>
+                            </form>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </form>
     {% else %}
     <div class="empty-state">
         <div class="empty-icon">&#128218;</div>
@@ -215,6 +225,36 @@ function openEditCourse(id) {
     document.getElementById('edit-max_students').value = c.max_students || 0;
     document.getElementById('editCourseForm').action = '/admin/edit-course/' + id;
     openModal('editCourseModal');
+}
+
+function toggleSelectAll(source) {
+    var checkboxes = document.querySelectorAll('.course-checkbox');
+    checkboxes.forEach(function(cb) { cb.checked = source.checked; });
+    updateDeleteButton();
+}
+
+function updateDeleteButton() {
+    var checked = document.querySelectorAll('.course-checkbox:checked').length;
+    document.getElementById('deleteSelectedBtn').disabled = checked === 0;
+}
+
+function deleteSelectedCourses() {
+    var checked = document.querySelectorAll('.course-checkbox:checked');
+    if (checked.length === 0) return;
+    if (!confirm('Delete ' + checked.length + ' selected course(s)?')) return;
+    document.getElementById('courseTableForm').action = '/admin/delete-courses-bulk';
+    document.getElementById('courseTableForm').method = 'POST';
+    document.getElementById('courseTableForm').submit();
+}
+
+function confirmDeleteAllTimetable() {
+    if (!confirm('DELETE ENTIRE TIMETABLE? This removes ALL courses and timetable entries but KEEPS lecturers. This cannot be undone.')) return;
+    if (!confirm('Are you absolutely sure?')) return;
+    var form = document.createElement('form');
+    form.method = 'POST';
+    form.action = '/admin/delete-all-timetable';
+    document.body.appendChild(form);
+    form.submit();
 }
 </script>
 {% endblock %}
